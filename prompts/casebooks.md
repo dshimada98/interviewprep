@@ -42,3 +42,5 @@ WHEN YOU'RE DONE
 Give me: (1) the files you created or changed, (2) a plain-English explanation of how case books connect to sessions and how the "most recent book" default works, and (3) the npm test result.
 
 ## Follow up prompts
+Can you add the year of when the casebook was published
+
