@@ -20,6 +20,10 @@ Do not change Git branches, merge, or push to main.
 **Why:** The user said, “I manage Git myself.”
 
 **How to apply:** Leave those Git operations to the user during implementation.
+Before building a dependent feature, verify its implementation is actually in
+the current checkout, not just a merged prompt.
+**Why:** A GitHub merge previously brought in the checklist brief without its
+implementation; continuing would have hidden a missing dependency.
 
 A brand-new account's empty dashboard is a critical user path.
 

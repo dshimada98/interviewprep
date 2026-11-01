@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { randomUUID } from 'node:crypto';
+import ExcelJS from 'exceljs';
 import { app, sessionStore } from '../artifacts/interviewprep/server/app.mjs';
 import { pool } from '../artifacts/interviewprep/server/db.mjs';
 import { seedQuestionTypes } from '../artifacts/interviewprep/server/question-types.mjs';
@@ -55,6 +56,127 @@ afterAll(async () => {
 });
 
 describe('practice-session data isolation', () => {
+  it('exports a complete, formatted, formula-free workbook containing only the signed-in user data', async () => {
+    const a = await signUp(), b = await signUp();
+    async function download(u: typeof a, query = {}) {
+      const response = await u.agent.get('/api/export.xlsx').query(query).buffer(true).parse((res, callback) => {
+        const chunks: Buffer[] = [];
+        res.on('data', (chunk: Buffer) => chunks.push(chunk));
+        res.on('end', () => callback(null, Buffer.concat(chunks)));
+        res.on('error', callback);
+      }).expect(200);
+      expect(response.headers['content-disposition']).toMatch(/attachment; filename="?InterviewPrep_\d{4}-\d{2}-\d{2}\.xlsx"?/);
+      expect(response.headers['content-type']).toContain('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      expect(response.headers['cache-control']).toBe('no-store');
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(response.body);
+      return workbook;
+    }
+    const allText = (book: ExcelJS.Workbook) => book.worksheets.flatMap(sheet => {
+      const values: string[] = [];
+      sheet.eachRow(row => row.eachCell(cell => {
+        expect(cell.formula).toBeUndefined();
+        if (typeof cell.value === 'string') values.push(cell.value);
+      }));
+      return values;
+    });
+    await request(app).get('/api/export.xlsx').expect(401);
+    const empty = await download(b);
+    expect(empty.worksheets.map(s => s.name)).toEqual(['Summary', 'Cases', 'Section notes', 'Behavioral', 'Stories']);
+    expect(allText(empty)).toContain('No sessions logged yet.');
+    const types = (await a.agent.get('/api/question-types').expect(200)).body;
+    const sections = (await a.agent.get('/api/case-sections').expect(200)).body;
+    const book = (await a.agent.post('/api/case-books').set('X-CSRF-Token', a.csrfToken)
+      .send({ name: 'Export casebook', publication_year: 2025 }).expect(201)).body;
+    const story = (await a.agent.post('/api/stories').set('X-CSRF-Token', a.csrfToken).send({
+      title: 'Private story', competency_id: types.behavioral[0].id, context: '=1+1',
+      situation: '+SUM(A1:A2)', task: '-1+2', action: '@SUM(A1)', result: 'A clear result',
+    }).expect(201)).body;
+    const first = (await a.agent.post('/api/sessions').set('X-CSRF-Token', a.csrfToken).send({
+      question_type_id: types.case[0].id, session_date: '2025-10-28', prompt: 'Coffee chain profitability',
+      case_book_id: book.id, format: 'partner', overall_score: 3,
+      went_well: '=HYPERLINK("https://example.test","literal text")', to_improve: 'Summarize recommendation',
+      section_scores: sections.slice(0, 3).map((s: { id: number }, i: number) =>
+        ({ section_id: s.id, score: [2, 3, 5][i], went_well: '=2+2', to_improve: `Section action ${i}` })),
+    }).expect(201)).body;
+    await a.agent.post(`/api/sessions/${first.id}/star`).set('X-CSRF-Token', a.csrfToken).expect(204);
+    await a.agent.post('/api/sessions').set('X-CSRF-Token', a.csrfToken).send({
+      question_type_id: types.case[0].id, session_date: '2025-10-29', prompt: '+Unfiltered newest case',
+      format: 'solo', overall_score: 5,
+    }).expect(201);
+    await a.agent.post('/api/sessions').set('X-CSRF-Token', a.csrfToken).send({
+      question_type_id: types.behavioral[0].id, story_id: story.id, session_date: '2025-10-30',
+      prompt: 'Behavioral private prompt', format: 'mock', overall_score: 4, to_improve: '@literal note',
+    }).expect(201);
+    await a.agent.post('/api/checklist').set('X-CSRF-Token', a.csrfToken)
+      .send({ text: 'Open export action', section_id: sections[0].id }).expect(200);
+    const done = (await a.agent.post('/api/checklist').set('X-CSRF-Token', a.csrfToken)
+      .send({ text: 'Completed action excluded' }).expect(200)).body;
+    await a.agent.patch(`/api/checklist/${done.id}`).set('X-CSRF-Token', a.csrfToken).send({ done: true }).expect(200);
+
+    const exported = await download(a, { search: 'does-not-match', kind: 'behavioral', book: 'none' });
+    const strings = allText(exported);
+    expect(strings).toContain('Coffee chain profitability');
+    expect(strings).toContain('Open export action');
+    expect(strings).not.toContain('Completed action excluded');
+    expect(strings).toContain('=1+1');
+    expect(strings).toContain('+SUM(A1:A2)');
+    const cases = exported.getWorksheet('Cases')!;
+    expect(cases.getRow(1).values).toEqual([undefined, 'Date', 'Case book', 'Case type', 'Prompt', 'Format', 'Overall score',
+      'Introduction', 'Framework', 'Exhibits', 'Math', 'Brainstorm', 'Recommendation', 'Driving the case forward',
+      'What went well', 'What to improve', 'Starred']);
+    expect(cases.rowCount).toBe(3);
+    expect(cases.getCell('D2').value).toBe('+Unfiltered newest case');
+    expect(cases.getCell('B2').value).toBe('No book / live case');
+    expect(cases.getCell('B3').value).toBe('Export casebook (2025)');
+    expect(cases.getCell('P3').value).toBe('Yes');
+    expect(cases.getCell('J3').value).toBeNull();
+    expect(cases.getCell('A3').value).toBeInstanceOf(Date);
+    expect((cases.getCell('A3').value as Date).toISOString().slice(0, 10)).toBe('2025-10-28');
+    expect(cases.getCell('A3').numFmt).toBe('d-mmm-yyyy');
+    expect(cases.getCell('F3').value).toBe(3);
+    for (const [address, fill] of [['G3', 'FFF5B7B1'], ['H3', 'FFFAD7A0'], ['I3', 'FFABEBC6']]) {
+      expect(cases.getCell(address).fill).toMatchObject({ type: 'pattern', fgColor: { argb: fill } });
+      expect(cases.getCell(address).font.color?.argb).toBe('FF1F2A44');
+    }
+    const notes = exported.getWorksheet('Section notes')!;
+    expect(notes.rowCount).toBe(4);
+    expect([2, 3, 4].map(n => notes.getCell(`C${n}`).value)).toEqual(sections.slice(0, 3).map((s: { name: string }) => s.name));
+    expect(exported.getWorksheet('Behavioral')!.getCell('C2').value).toBe('Private story');
+    const stories = exported.getWorksheet('Stories')!;
+    expect(stories.getCell('H2').value).toBe(1);
+    expect(stories.getCell('I2').value).toBe(4);
+    const dashboard = (await a.agent.get('/api/dashboard').expect(200)).body;
+    const summary = exported.getWorksheet('Summary')!;
+    const summaryRows: ExcelJS.CellValue[][] = [];
+    summary.eachRow(row => { summaryRows.push(row.values as ExcelJS.CellValue[]); });
+    const metric = (name: string) => summaryRows.find(row => row[2] === name && row[1] === 'Key stats')?.[3];
+    expect(metric('Cases logged')).toBe(dashboard.total_cases);
+    expect(metric('Average case score')).toBe(dashboard.average_case_score);
+    expect(metric('Weakest case type')).toBe(dashboard.weakest_case_type.name);
+    expect(metric('Behavioral sessions')).toBe(dashboard.behavioral_sessions);
+    expect(summaryRows.filter(row => row[1] === 'Section averages')).toHaveLength(7);
+    expect(summaryRows.filter(row => row[1] === 'Strongest sections').map(row => row[2]))
+      .toEqual([sections[2].name, sections[1].name]);
+    expect(summaryRows.filter(row => row[1] === 'Focus areas').map(row => row[5]))
+      .toEqual(dashboard.next_case_focus.map((s: { note: { text: string } | null }) => s.note?.text ?? null));
+    for (const sheet of exported.worksheets) {
+      const row = sheet.name === 'Summary' ? 5 : 1;
+      expect(sheet.getRow(row).getCell(1).font).toMatchObject({ bold: true, color: { argb: 'FFFFFFFF' } });
+      expect(sheet.getRow(row).getCell(1).fill).toMatchObject({ fgColor: { argb: 'FF1F2A44' } });
+      expect(sheet.views[0]).toMatchObject({ state: 'frozen', ySplit: row });
+      expect(sheet.autoFilter).toBeTruthy();
+    }
+    expect(cases.getCell('D3').alignment.wrapText).toBe(true);
+    // Spoofed owner/query filters cannot change the export's server-side ownership.
+    const other = await download(b, { user_id: a.id });
+    expect(allText(other)).not.toContain('Coffee chain profitability');
+    expect(allText(other)).not.toContain('Private story');
+    expect(allText(other)).not.toContain('Open export action');
+    expect(other.getWorksheet('Cases')!.rowCount).toBe(1);
+    expect(other.getWorksheet('Stories')!.rowCount).toBe(1);
+  });
+
   it('isolates checklist reads, writes, clears and note sources between users', async () => {
     const a = await signUp(), b = await signUp();
     const add = (u: typeof a, data: object) => u.agent.post('/api/checklist').set('X-CSRF-Token', u.csrfToken).send(data);

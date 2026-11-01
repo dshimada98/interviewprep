@@ -2,8 +2,8 @@ import { pool } from './db.mjs';
 
 // One statement gives every tile and chart the same database snapshot.
 // All session and score aggregates descend from this ownership boundary.
-export async function getDashboard(userId) {
-  const { rows } = await pool.query(`
+export async function getDashboard(userId, database = pool) {
+  const { rows } = await database.query(`
     WITH owned AS MATERIALIZED (
       SELECT p.*, q.kind
       FROM practice_sessions p JOIN question_types q ON q.id = p.question_type_id

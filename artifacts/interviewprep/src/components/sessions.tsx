@@ -18,6 +18,7 @@ import { StorySelect } from './story-select';
 import { CategorySelect } from './category-select';
 import { CaseBookSelect, NO_BOOK, useCaseBooks } from './case-book-select';
 import { caseBookLabel } from './case-book-label';
+import { ExportButton } from './export-button';
 import { ClearFilters, FinderControls, useSessionFinder } from './session-finder';
 import { STAR_ERROR, StarButton, useStarToggle, type StarToggle } from './session-stars';
 import { AddNoteButton } from './checklist';
@@ -159,16 +160,19 @@ export function SessionsListPage() {
   const none = data && data.total === 0 && !f.active;
   return (
     <Shell title="Practice sessions">
-      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-5">
+      <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-5">
         <div className="ip-rise">
           <p className="text-xs font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--green-text)' }}>Practice log</p>
           <h1 className="mt-2 text-3xl sm:text-4xl font-bold tracking-tight">Your sessions</h1>
         </div>
+        <div className="flex flex-col sm:flex-row gap-2 sm:items-start">
+        <ExportButton />
         <Link href="/sessions/new" data-testid="link-new-session"
           className="ip-focus ip-rise min-h-11 px-5 rounded-lg inline-flex items-center justify-center gap-2 font-semibold text-white"
           style={{ background: 'var(--navy)', borderBottom: '3px solid var(--green)' }}>
           <Plus className="h-4 w-4" aria-hidden />Log a session
         </Link>
+        </div>
       </div>
 
       <FinderControls f={f} />

@@ -11,6 +11,21 @@ tags:
   - name: health
     description: Health operations
 paths:
+  /export.xlsx:
+    get:
+      operationId: exportWorkbook
+      security: [{sessionCookie: []}]
+      responses:
+        "200":
+          description: Complete private practice workbook, independent of page filters
+          headers:
+            Content-Disposition:
+              schema: {type: string}
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: {type: string, format: binary}
+        "401":
+          description: Sign in required
   /checklist:
     get:
       operationId: getChecklist
