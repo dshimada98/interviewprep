@@ -11,6 +11,84 @@ tags:
   - name: health
     description: Health operations
 paths:
+  /sessions:
+    get:
+      operationId: listSessions
+      security: [{sessionCookie: []}]
+      responses:
+        "200":
+          description: Current user's sessions, newest date first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PracticeSession"
+    post:
+      operationId: createSession
+      security: [{sessionCookie: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessionInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PracticeSession"
+        "400":
+          $ref: "#/components/responses/InvalidSession"
+  /sessions/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+    get:
+      operationId: getSession
+      security: [{sessionCookie: []}]
+      responses:
+        "200":
+          description: Owned session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PracticeSession"
+        "404":
+          description: Session not found
+    put:
+      operationId: updateSession
+      security: [{sessionCookie: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessionInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PracticeSession"
+        "400":
+          $ref: "#/components/responses/InvalidSession"
+        "404":
+          description: Session not found
+    delete:
+      operationId: deleteSession
+      security: [{sessionCookie: []}]
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Session not found
   /question-types:
     get:
       operationId: getQuestionTypes
@@ -49,12 +127,76 @@ paths:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
 components:
+  responses:
+    InvalidSession:
+      description: Invalid session fields
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/SessionValidationError"
   securitySchemes:
     sessionCookie:
       type: apiKey
       in: cookie
       name: interviewprep.sid
   schemas:
+    SessionInput:
+      type: object
+      required: [session_date, question_type_id, prompt, format, overall_score]
+      properties:
+        session_date:
+          type: string
+          pattern: '^\d{4}-\d{2}-\d{2}$'
+        question_type_id:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+        prompt:
+          type: string
+          minLength: 1
+          maxLength: 4000
+        format:
+          type: string
+          enum: [solo, partner, mock]
+        overall_score:
+          type: integer
+          minimum: 1
+          maximum: 5
+        duration_minutes:
+          type: [integer, "null"]
+          minimum: 0
+          maximum: 2147483647
+        went_well:
+          type: [string, "null"]
+          maxLength: 4000
+        to_improve:
+          type: [string, "null"]
+          maxLength: 4000
+    PracticeSession:
+      allOf:
+        - $ref: "#/components/schemas/SessionInput"
+        - type: object
+          required: [id, question_type_name, kind, created_at]
+          properties:
+            id:
+              type: integer
+            question_type_name:
+              type: string
+            kind:
+              type: string
+              enum: [case, behavioral]
+            created_at:
+              type: string
+    SessionValidationError:
+      type: object
+      required: [message, errors]
+      properties:
+        message:
+          type: string
+        errors:
+          type: object
+          additionalProperties:
+            type: string
     QuestionType:
       type: object
       required: [id, name, kind]

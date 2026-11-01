@@ -1,8 +1,9 @@
 # InterviewPrep
 
 InterviewPrep is a consulting case and behavioral interview preparation tracker.
-Features 1 and 2 cover custom email/password authentication and the initial
-practice data model/reference areas. No session CRUD or later features exist.
+Features 1–3 cover custom email/password authentication, shared practice areas,
+and private practice-session logging, detail, editing, and confirmed deletion.
+Later scorecard, star, dashboard, and story features are not included.
 
 ## Run & Operate
 
@@ -26,7 +27,7 @@ practice data model/reference areas. No session CRUD or later features exist.
 ## Where things live
 
 - `PLAN.md` — full product roadmap; build only the currently requested feature.
-- `schema.md` — current table definitions, relationships, seeding, and Feature 2 API.
+- `schema.md` — current table definitions, relationships, seeding, and reference/session APIs.
 - `attached_assets/` — original user briefs.
 - `artifacts/interviewprep/` — product React frontend and Express auth backend. `server/app.mjs` exports the app without a listener; `server/index.mjs` starts it.
 - `artifacts/api-server/` — retained unused setup scaffold; it must not intercept the product's `/api` routes.
@@ -44,9 +45,8 @@ practice data model/reference areas. No session CRUD or later features exist.
 
 ## Product
 
-The separate Feature 1 build is email/password signup, login, logout, and a
-protected welcome page. Later practice tracking, scorecards, stars, dashboard,
-and stories must not be built early.
+The product provides email/password signup, login, logout, a protected welcome
+page, and session CRUD. Build later features only when explicitly requested.
 
 ## User preferences
 
@@ -68,7 +68,7 @@ and stories must not be built early.
   `practice_sessions`. Never run the empty scaffold's Drizzle push over them.
 - Startup seeds only missing shared question types in both development and
   production, after schema provisioning. No startup DDL or production migration
-  hooks. Practice-session CRUD and story links remain out of scope.
+  hooks. Story links and other later-feature tables remain out of scope.
 - Every future API router goes below the shared `requireAuth` boundary in the product's `server/app.mjs`. Mutations require its session-bound CSRF token.
 
 ## Pointers

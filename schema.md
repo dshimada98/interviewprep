@@ -1,4 +1,4 @@
-# InterviewPrep database schema — Features 1 and 2
+# InterviewPrep database schema — Features 1–3
 
 The application's SQL source of truth is
 `artifacts/interviewprep/server/schema.sql`. There are three product tables
@@ -35,8 +35,9 @@ Initial reference rows:
 
 ## practice_sessions
 
-Each practice session belongs to exactly one user. This feature adds storage
-only; there are no practice-session forms, list/detail pages, or CRUD APIs yet.
+Each practice session belongs to exactly one user. Feature 3 uses this existing
+table for the authenticated practice log, creation, detail, editing, and deletion.
+No new tables or columns are needed.
 
 | Column | PostgreSQL type | Rules |
 | --- | --- | --- |
@@ -166,3 +167,58 @@ states rather than hardcoded reference data.
   scrolling. At laptop width the groups appear side by side.
 - Log out and request `/api/question-types`; expect HTTP 401.
 - Restart the product workflow and confirm no duplicate reference rows appear.
+
+## Practice-session API (Feature 3)
+
+All endpoints require the current login session. POST, PUT, and DELETE also
+require its `X-CSRF-Token`. Ownership always comes from the authenticated user,
+never a submitted `user_id`. Missing, malformed, and foreign IDs return the
+same HTTP 404 response, including for updates and deletion.
+
+| Method | Endpoint | Result |
+| --- | --- | --- |
+| GET | `/api/sessions` | Current user's sessions, newest practice date first (creation time and ID break ties) |
+| POST | `/api/sessions` | Create and return a session with HTTP 201 |
+| GET | `/api/sessions/:id` | Return one owned session |
+| PUT | `/api/sessions/:id` | Replace editable fields on an owned session |
+| DELETE | `/api/sessions/:id` | Delete an owned session with HTTP 204 |
+
+Session responses contain `id`, all editable fields, `question_type_name`,
+`kind`, and `created_at`. They do not expose `user_id`. `session_date` is a
+`YYYY-MM-DD` calendar-date string, without time-zone conversion.
+
+POST and PUT require `session_date` (a real calendar date), `question_type_id`
+(an existing shared type), nonblank `prompt`, `format` (`solo`, `partner`, or
+`mock`), and integer `overall_score` from 1 to 5. Optional `duration_minutes`
+is null or a nonnegative PostgreSQL-range integer. Optional `went_well` and
+`to_improve` are overall notes, not section feedback. Text is trimmed and
+limited to 4,000 characters per field. Omitted/blank optional notes and omitted
+or null minutes become SQL NULL; PUT can explicitly clear existing values.
+Numeric JSON fields must be numbers, not numeric strings.
+
+Invalid fields return HTTP 400:
+
+```json
+{
+  "message": "Please check the highlighted fields.",
+  "errors": {"overall_score": "Please choose a whole-number score from 1 to 5."}
+}
+```
+
+The UI performs matching inline checks and displays server field errors.
+The OpenAPI contract and generated React Query hooks live in `lib/api-spec`
+and `lib/api-client-react`. The Express router validates inputs before SQL and
+uses parameterized, ownership-scoped queries for every read and mutation.
+
+Protected frontend routes:
+
+- `/sessions` — saved practice log, with loading, retry, and empty states.
+- `/sessions/new` — create a practice session.
+- `/sessions/:id` — session detail and confirmation-before-delete.
+- `/sessions/:id/edit` — edit current values, including clearing optional fields.
+
+`pnpm test` includes real-database session CRUD, invalid input, CSRF, date
+round-trip, deletion persistence, and two-user isolation tests. Browser checks
+should cover create → reload → edit → reload → cancel deletion → confirm
+deletion, and check phone/laptop layouts. No scorecards, stars, dashboard, or
+story features are included.

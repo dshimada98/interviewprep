@@ -9,6 +9,9 @@ export const messages = {
   email: 'Please enter a valid email address.',
 };
 let csrfToken = '';
+export function sessionRequestOptions() {
+  return { credentials: 'same-origin' as const, headers: { 'X-CSRF-Token': csrfToken } };
+}
 export async function authRequest(path: string, body?: object) {
   const response = await fetch(`/api/auth/${path}`, {
     method: body ? 'POST' : 'GET',
