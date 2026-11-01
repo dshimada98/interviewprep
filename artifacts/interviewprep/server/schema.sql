@@ -138,3 +138,22 @@ CREATE TABLE IF NOT EXISTS stars (
   PRIMARY KEY (user_id, session_id)
 );
 CREATE INDEX IF NOT EXISTS stars_session_id_idx ON stars (session_id);
+
+CREATE TABLE IF NOT EXISTS checklist_items (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  text TEXT NOT NULL CHECK (text ~ '[^[:space:]]' AND length(text) <= 200),
+  section_id INTEGER REFERENCES case_sections(id),
+  source_session_id INTEGER REFERENCES practice_sessions(id) ON DELETE SET NULL,
+  from_note BOOLEAN NOT NULL DEFAULT false,
+  done BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  done_at TIMESTAMPTZ,
+  CHECK ((done AND done_at IS NOT NULL) OR (NOT done AND done_at IS NULL))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS checklist_items_source_note_idx
+  ON checklist_items (user_id, source_session_id, coalesce(section_id, 0))
+  WHERE source_session_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS checklist_items_user_state_idx
+  ON checklist_items (user_id, done, created_at DESC);
+CREATE INDEX IF NOT EXISTS checklist_items_source_session_idx ON checklist_items (source_session_id);

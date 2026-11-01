@@ -1,9 +1,9 @@
-# InterviewPrep database schema — Features 1–12
+# InterviewPrep database schema — Features 1–13
 
 The application's SQL source of truth is
-`artifacts/interviewprep/server/schema.sql`. There are eight product tables
+`artifacts/interviewprep/server/schema.sql`. There are nine product tables
 (`users`, `question_types`, `practice_sessions`, `case_sections`, and
-`section_scores`, `stars`, `stories`, and `case_books`) plus the existing technical `login_sessions` table used for
+`section_scores`, `stars`, `stories`, `case_books`, and `checklist_items`) plus the existing technical `login_sessions` table used for
 authentication. Behavioral practice sessions may optionally link to an owned story.
 
 ## users
@@ -133,9 +133,46 @@ This is not a relational foreign key to `users`; deleting a user does not
 automatically delete these cookie sessions. Authentication middleware checks
 that the referenced user still exists before allowing protected API access.
 
+## checklist_items — improvement checklist
+
+| Column | PostgreSQL type | Rules |
+| --- | --- | --- |
+| id | integer (`SERIAL`) | Primary key |
+| user_id | integer | Required FK to users.id, ON DELETE CASCADE |
+| text | text | Required, nonblank, up to 200 characters |
+| section_id | integer, nullable | Optional FK to case_sections.id |
+| source_session_id | integer, nullable | Optional FK to practice_sessions.id, ON DELETE SET NULL |
+| from_note | boolean | Required, default false; retains provenance after source deletion |
+| done | boolean | Required, default false |
+| created_at | timestamp with time zone | Required, defaults to now() |
+| done_at | timestamp with time zone, nullable | Set when done, cleared when undone |
+
+The database enforces a unique `(user_id, source_session_id,
+coalesce(section_id, 0))` for non-null source sessions. Thus the overall note
+(no section) and each section note have separate identities. Concurrent requests
+for the same note return the existing item, preserving its edited text and
+completion state, rather than inserting a duplicate. Manual items have no source
+and are not deduplicated by text.
+
+All `/api/checklist` routes require login and writes require the existing CSRF
+token. Ownership comes from the server session, never request input. Foreign
+items and source sessions return `404 {"message":"Item not found"}`.
+`GET` returns open items newest first, the ten most recently completed items,
+the full completed count, and note membership including older completed items.
+`POST` accepts text and an optional section, or a source session plus optional
+section; source text is copied on the server. Blank or over-200-character notes
+return the same friendly text validation errors rather than silently truncating.
+`PATCH /:id` edits text and/or toggles done with its timestamp. `DELETE /:id`
+deletes one item; `DELETE /completed` deletes only this user's completed items.
+Deleting a source session keeps copied text and completion state; deleting the
+owning user removes their checklist. Shared case sections remain unchanged.
+
 ## Relationships in plain English
 
 - A user has many practice sessions. Each practice session belongs to one user.
+- A user has many checklist items; each item belongs to exactly one user.
+- A checklist item can optionally point to a case section and to the session it came from.
+- Deleting a source session clears its checklist links, but keeps the items and their copied text.
 - A case book has many case sessions; shared books have no owner, custom books belong to one user.
 - A session may use one case book or none; deleting a book never deletes its sessions.
 - A question type has many practice sessions. Each practice session has one
@@ -154,6 +191,9 @@ that the referenced user still exists before allowing protected API access.
 ```mermaid
 erDiagram
     users ||--o{ practice_sessions : owns
+    users ||--o{ checklist_items : owns
+    case_sections |o--o{ checklist_items : tags
+    practice_sessions |o--o{ checklist_items : source
     users |o--o{ case_books : owns_custom
     case_books |o--o{ practice_sessions : sourced_from
     question_types ||--o{ practice_sessions : categorizes
@@ -199,6 +239,17 @@ erDiagram
         integer user_id FK
         timestamptz created_at
     }
+    checklist_items {
+        integer id PK
+        integer user_id FK
+        text text
+        integer section_id FK
+        integer source_session_id FK
+        boolean from_note
+        boolean done
+        timestamptz created_at
+        timestamptz done_at
+    }
     case_sections {
         integer id PK
         text name UK
@@ -243,7 +294,7 @@ erDiagram
    tables/indexes without dropping existing tables or account data.
 2. **Production schema:** When the user chooses to publish, Replit's managed
    Publish process applies the development-to-production schema comparison.
-    Review that comparison to ensure all nine tables, `question_types.user_id`,
+    Review that comparison to ensure all ten tables, `question_types.user_id`,
    its cascading foreign key, the normalized-name indexes and scope-check
    function/trigger, case-book normalized-name indexes and scope-check trigger,
    and the `story_id` and `case_book_id` foreign keys exist before serving the

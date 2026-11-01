@@ -1,23 +1,16 @@
 import { AlertCircle, ChevronDown, Plus } from 'lucide-react';
 import {
-  getGetCaseSectionsQueryKey, useGetCaseSections,
   type CaseSection, type SectionScore, type SectionScoreInput,
 } from '@workspace/api-client-react';
-import { sessionRequestOptions, useAuth } from '@/auth';
+import { AddNoteButton } from './checklist';
+import { useCaseSections } from './case-sections-query';
+export { useCaseSections } from './case-sections-query';
 
 export type ScoreDraft = { score: number | null; went_well: string; to_improve: string; open: boolean };
 export type ScoreDrafts = Record<number, ScoreDraft>;
 
 const LABEL = ['', 'Struggled', 'Shaky', 'Solid', 'Strong', 'Excellent'];
 const BLANK: ScoreDraft = { score: null, went_well: '', to_improve: '', open: false };
-
-export function useCaseSections(enabled = true) {
-  const { user } = useAuth();
-  return useGetCaseSections({
-    query: { queryKey: [...getGetCaseSectionsQueryKey(), user?.id], enabled: !!user && enabled, retry: false },
-    request: sessionRequestOptions(),
-  });
-}
 
 export function draftsFrom(scores: SectionScore[] | undefined): ScoreDrafts {
   const out: ScoreDrafts = {};
@@ -145,7 +138,7 @@ function Badge({ score }: { score: number | null }) {
 const Note = ({ v }: { v: string | null | undefined }) =>
   v ? <span className="whitespace-pre-wrap break-words">{v}</span> : <span className="text-muted-foreground">-</span>;
 
-export function ScorecardView({ scores }: { scores: SectionScore[] }) {
+export function ScorecardView({ scores, sessionId }: { scores: SectionScore[]; sessionId?: number }) {
   const q = useCaseSections();
   const byId = new Map(scores.map(s => [s.section_id, s]));
   const rows: { id: number; name: string; s?: SectionScore }[] = q.data
@@ -168,7 +161,7 @@ export function ScorecardView({ scores }: { scores: SectionScore[] }) {
                   <td className="py-3 pr-3 font-semibold">{r.name}</td>
                   <td className="py-3 pr-3"><Badge score={r.s?.score ?? null} /></td>
                   <td className="py-3 pr-3"><Note v={r.s?.went_well} /></td>
-                  <td className="py-3"><Note v={r.s?.to_improve} /></td>
+                  <td className="py-3"><Note v={r.s?.to_improve} />{sessionId != null && r.s?.to_improve && <AddNoteButton sessionId={sessionId} sectionId={r.id} label={r.name} />}</td>
                 </tr>
               ))}
             </tbody>
@@ -181,7 +174,7 @@ export function ScorecardView({ scores }: { scores: SectionScore[] }) {
                 {r.s && (r.s.went_well || r.s.to_improve) && (
                   <dl className="mt-2 space-y-2">
                     <div><dt className="text-xs font-semibold text-muted-foreground">What went well</dt><dd><Note v={r.s.went_well} /></dd></div>
-                    <div><dt className="text-xs font-semibold text-muted-foreground">What to improve</dt><dd><Note v={r.s.to_improve} /></dd></div>
+                    <div><dt className="text-xs font-semibold text-muted-foreground">What to improve</dt><dd><Note v={r.s.to_improve} />{sessionId != null && r.s.to_improve && <AddNoteButton sessionId={sessionId} sectionId={r.id} label={r.name} />}</dd></div>
                   </dl>
                 )}
               </li>
