@@ -1,0 +1,42 @@
+I'm building InterviewPrep, a consulting case and behavioral interview prep tracker. The full plan is in PLAN.md in the repo root. Read it for context, but build ONLY Feature 1 (sign up and login) right now. I will build the other features one at a time later, each on its own branch.
+
+STACK
+- React front end, Node/Express back end, Replit's built-in PostgreSQL database.
+- Structure the back end so the Express app is created and exported in its own file (e.g. server/app.ts), separate from the file that starts the server. I will add automated tests later that import the app directly.
+
+DATABASE
+- Create only a users table: id (primary key), email (text, unique, required), password_hash (text, required), created_at (timestamp).
+- Do not create any other tables yet.
+
+AUTHENTICATION
+- Build email and password sign up and login inside the app. Do NOT use Replit Auth, Google login, or any third-party login.
+- Hash passwords with bcrypt. Never store or log plain-text passwords.
+- Use express-session with sessions stored in PostgreSQL, an httpOnly cookie, and the session secret read from an environment variable called SESSION_SECRET (tell me how to add it in Replit Secrets).
+- Store emails in lowercase so "Daisuke@x.com" and "daisuke@x.com" are the same account.
+
+PAGES AND BEHAVIOR
+- Sign up page: email, password, confirm password. Password must be at least 8 characters.
+- Log in page: email and password.
+- After sign up or login, go to a home page that says "Welcome to InterviewPrep" and shows the logged-in email.
+- A header on every logged-in page with the app name "InterviewPrep" and a Log out button.
+- Anyone not logged in who visits a logged-in page is sent to the log in page.
+- Add an auth check (middleware) that every future /api route will use: if the user is not logged in, return 401.
+
+FRIENDLY ERROR MESSAGES (shown on the page, not as browser alerts)
+- Email already registered: "An account with this email already exists. Try logging in."
+- Wrong email or password: "Email or password is incorrect." (do not reveal which one was wrong)
+- Passwords don't match: "Passwords don't match."
+- Password too short: "Password must be at least 8 characters."
+- Blank fields: "Please fill in all fields."
+
+DESIGN (set this up now as the foundation for every future page)
+- Clean, professional "consulting deck" style: white background, navy (#1F2A44) header and text, light gray (#F2F4F7) cards, one green accent (#2E9E6B), plenty of white space, Inter font.
+- Define these colors once as shared theme values so every future page reuses them, including a score color scale: 1-2 red (#C0392B), 3 amber (#D68910), 4-5 green (#2E9E6B).
+- Mobile-first and responsive: must look good on a phone (around 375px wide) and on a laptop. Single column on phones, buttons and inputs at least 44px tall, nothing ever scrolls sideways on the page. On a phone the header's links collapse into a compact menu.
+
+DO NOT
+- Build sessions, scorecards, stars, dashboard, stories, or any other feature.
+- Change git branches, merge, or push to main. I manage Git myself.
+
+WHEN YOU'RE DONE
+Give me: (1) a list of the files you created or changed, (2) a plain-English explanation of how sign up, login, and logout work from the moment I click the button to the moment data is saved, and (3) step-by-step instructions for testing it manually.
