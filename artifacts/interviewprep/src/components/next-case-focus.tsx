@@ -1,4 +1,5 @@
 import { Link } from 'wouter';
+import { AddNoteButton } from './checklist';
 import type { NextCaseFocusSection } from '@workspace/api-client-react';
 
 type ScoreColor = (score: number) => string;
@@ -35,6 +36,7 @@ function FocusItem({ s, scoreColor }: { s: NextCaseFocusSection; scoreColor: Sco
             className="ip-focus mt-2 inline-block max-w-full text-xs font-medium underline underline-offset-2 decoration-[color:var(--green)] break-words [overflow-wrap:anywhere]">
             From: {dt.short} · {n.prompt}
           </Link>
+          <div><AddNoteButton sessionId={n.session_id} sectionId={s.section_id} label={s.section_name} /></div>
         </div>
       ) : (
         <p className="mt-3 text-sm text-muted-foreground" data-testid={`text-focus-no-note-${s.section_id}`}>

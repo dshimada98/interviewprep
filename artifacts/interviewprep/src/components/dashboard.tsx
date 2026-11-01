@@ -7,6 +7,7 @@ import { useAuth, sessionRequestOptions } from '@/auth';
 import { AppHeader } from './ip';
 import { PracticeAreas } from './practice-areas';
 import { NextCaseFocus } from './next-case-focus';
+import { ChecklistCard } from './checklist';
 import { ByCaseBook } from './case-book-panel';
 import { dashboardKey, statusOf } from './session-keys';
 
@@ -209,6 +210,7 @@ export function DashboardPage() {
         <h1 className="ip-rise mt-2 mb-6 sm:mb-8 text-3xl sm:text-4xl font-bold tracking-tight">Dashboard</h1>
 
         {d && <div className="mb-5"><NextCaseFocus focus={d.next_case_focus} scoreColor={bandColor} /></div>}
+        {(d || !q.isLoading) && <div className="mb-5"><ChecklistCard /></div>}
         {q.isLoading ? <Skeleton /> : q.isError && !d ? (
           <div className="rounded-xl border-l-4 bg-white p-5 space-y-3" style={{ borderColor: 'var(--score-1)' }} data-testid="status-dashboard-error">
             <p role="alert" className="flex items-start gap-2 font-medium" style={{ color: 'var(--score-1)' }}>

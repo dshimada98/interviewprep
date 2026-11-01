@@ -8,6 +8,108 @@
 import * as zod from 'zod';
 
 
+export const GetChecklistResponse = zod.object({
+  "open": zod.array(zod.object({
+  "id": zod.number().int(),
+  "user_id": zod.number().int(),
+  "text": zod.string(),
+  "section_id": zod.number().int().nullable(),
+  "source_session_id": zod.number().int().nullable(),
+  "from_note": zod.boolean(),
+  "done": zod.boolean(),
+  "created_at": zod.string(),
+  "done_at": zod.string().nullable(),
+  "section_name": zod.string().nullable(),
+  "source_session_date": zod.string().nullable(),
+  "source_session_prompt": zod.string().nullable()
+})),
+  "completed": zod.array(zod.object({
+  "id": zod.number().int(),
+  "user_id": zod.number().int(),
+  "text": zod.string(),
+  "section_id": zod.number().int().nullable(),
+  "source_session_id": zod.number().int().nullable(),
+  "from_note": zod.boolean(),
+  "done": zod.boolean(),
+  "created_at": zod.string(),
+  "done_at": zod.string().nullable(),
+  "section_name": zod.string().nullable(),
+  "source_session_date": zod.string().nullable(),
+  "source_session_prompt": zod.string().nullable()
+})),
+  "completed_count": zod.number().int(),
+  "note_keys": zod.array(zod.object({
+  "source_session_id": zod.number().int(),
+  "section_id": zod.number().int().nullable()
+}))
+})
+
+
+export const createChecklistItemBodyTextMax = 200;
+
+
+
+export const CreateChecklistItemBody = zod.object({
+  "text": zod.string().max(createChecklistItemBodyTextMax).optional(),
+  "section_id": zod.number().int().nullish(),
+  "source_session_id": zod.number().int().nullish()
+})
+
+export const CreateChecklistItemResponse = zod.object({
+  "id": zod.number().int(),
+  "user_id": zod.number().int(),
+  "text": zod.string(),
+  "section_id": zod.number().int().nullable(),
+  "source_session_id": zod.number().int().nullable(),
+  "from_note": zod.boolean(),
+  "done": zod.boolean(),
+  "created_at": zod.string(),
+  "done_at": zod.string().nullable(),
+  "section_name": zod.string().nullable(),
+  "source_session_date": zod.string().nullable(),
+  "source_session_prompt": zod.string().nullable()
+})
+
+
+export const ClearCompletedChecklistResponse = zod.void()
+
+
+export const UpdateChecklistItemParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const updateChecklistItemBodyTextMax = 200;
+
+
+
+export const UpdateChecklistItemBody = zod.object({
+  "text": zod.string().max(updateChecklistItemBodyTextMax).optional(),
+  "done": zod.boolean().optional()
+})
+
+export const UpdateChecklistItemResponse = zod.object({
+  "id": zod.number().int(),
+  "user_id": zod.number().int(),
+  "text": zod.string(),
+  "section_id": zod.number().int().nullable(),
+  "source_session_id": zod.number().int().nullable(),
+  "from_note": zod.boolean(),
+  "done": zod.boolean(),
+  "created_at": zod.string(),
+  "done_at": zod.string().nullable(),
+  "section_name": zod.string().nullable(),
+  "source_session_date": zod.string().nullable(),
+  "source_session_prompt": zod.string().nullable()
+})
+
+
+export const DeleteChecklistItemParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const DeleteChecklistItemResponse = zod.void()
+
+
 export const ListStoriesQueryParams = zod.object({
   "competency": zod.coerce.number().int().optional()
 })

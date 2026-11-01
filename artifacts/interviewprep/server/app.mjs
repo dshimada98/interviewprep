@@ -12,6 +12,7 @@ import { practiceSessions } from './practice-sessions.mjs';
 import { getDashboard } from './dashboard.mjs';
 import { stories } from './stories.mjs';
 import { caseBooks } from './case-books.mjs';
+import { checklist } from './checklist.mjs';
 
 const production = process.env.NODE_ENV === 'production';
 if (!process.env.SESSION_SECRET) throw new Error('SESSION_SECRET is required. Add it in Replit Secrets.');
@@ -145,6 +146,7 @@ app.get('/api/case-sections', async (_req, res) => {
   res.json(await getCaseSections());
 });
 app.use('/api/sessions', practiceSessions);
+app.use('/api/checklist', checklist);
 app.get('/api/question-types', async (req, res) => {
   res.json(await getGroupedQuestionTypes(req.user.id));
 });

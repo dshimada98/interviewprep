@@ -11,6 +11,69 @@ tags:
   - name: health
     description: Health operations
 paths:
+  /checklist:
+    get:
+      operationId: getChecklist
+      security: [{sessionCookie: []}]
+      responses:
+        "200":
+          description: Owned open items, ten most recent completed items, and note membership
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChecklistList"
+    post:
+      operationId: createChecklistItem
+      security: [{sessionCookie: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChecklistInput"
+      responses:
+        "200":
+          description: Created item or existing item for the same source note
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChecklistItem"
+  /checklist/completed:
+    delete:
+      operationId: clearCompletedChecklist
+      security: [{sessionCookie: []}]
+      responses:
+        "204":
+          description: Owned completed items deleted
+  /checklist/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+    patch:
+      operationId: updateChecklistItem
+      security: [{sessionCookie: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChecklistUpdate"
+      responses:
+        "200":
+          description: Updated owned item
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChecklistItem"
+    delete:
+      operationId: deleteChecklistItem
+      security: [{sessionCookie: []}]
+      responses:
+        "204":
+          description: Owned item deleted
   /stories:
     get:
       operationId: listStories
@@ -509,6 +572,53 @@ components:
           type: string
         average_score:
           type: number
+    ChecklistInput:
+      type: object
+      properties:
+        text: {type: string, maxLength: 200}
+        section_id: {type: [integer, "null"]}
+        source_session_id: {type: [integer, "null"]}
+    ChecklistUpdate:
+      type: object
+      properties:
+        text: {type: string, maxLength: 200}
+        done: {type: boolean}
+    ChecklistNoteKey:
+      type: object
+      required: [source_session_id, section_id]
+      properties:
+        source_session_id: {type: integer}
+        section_id: {type: [integer, "null"]}
+    ChecklistItem:
+      type: object
+      required: [id, user_id, text, section_id, source_session_id, from_note, done, created_at, done_at, section_name, source_session_date, source_session_prompt]
+      properties:
+        id: {type: integer}
+        user_id: {type: integer}
+        text: {type: string}
+        section_id: {type: [integer, "null"]}
+        source_session_id: {type: [integer, "null"]}
+        from_note: {type: boolean}
+        done: {type: boolean}
+        created_at: {type: string}
+        done_at: {type: [string, "null"]}
+        section_name: {type: [string, "null"]}
+        source_session_date: {type: [string, "null"]}
+        source_session_prompt: {type: [string, "null"]}
+    ChecklistList:
+      type: object
+      required: [open, completed, completed_count, note_keys]
+      properties:
+        open:
+          type: array
+          items: {$ref: "#/components/schemas/ChecklistItem"}
+        completed:
+          type: array
+          items: {$ref: "#/components/schemas/ChecklistItem"}
+        completed_count: {type: integer}
+        note_keys:
+          type: array
+          items: {$ref: "#/components/schemas/ChecklistNoteKey"}
     DashboardCaseBook:
       type: object
       required: [case_book_id, name, publication_year, count, average_score, last_practiced]
