@@ -40,3 +40,6 @@ DO NOT
 
 WHEN YOU'RE DONE
 Give me: (1) a list of the files you created or changed, (2) a plain-English explanation of how sign up, login, and logout work from the moment I click the button to the moment data is saved, and (3) step-by-step instructions for testing it manually.
+
+==
+Just to be extra secure, I want to make sure that special characters are needed for passwords. 
