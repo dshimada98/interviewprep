@@ -4,7 +4,7 @@
 
 I'm building **InterviewPrep**, a tracker for consulting case practice and behavioral interview stories, because I'm recruiting for consulting this fall and this lives in a difficult to read spreadsheet. I want to score every case section by section, see which case types and sections are my weakest, keep my behavioral stories in one place, and walk into my next case knowing exactly what to work on.
 
-**How often:** TODO(Daisuke): 2-3 times a week*
+**How often:** 2-3 times a week*
 
 ## 2. Features (in build order)
 
