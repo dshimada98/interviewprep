@@ -7,7 +7,7 @@ import NotFound from '@/pages/not-found';
 import { Route, Switch, useLocation, Router as WouterRouter } from 'wouter';
 import { AuthProvider } from '@/auth';
 import { AppHeader, AuthPage, GuestOnly, HomePage, Protected } from '@/components/ip';
-import { EditSessionPage, NewSessionPage, SessionCacheGuard, SessionDetailPage, SessionsListPage } from '@/components/sessions';
+import { EditSessionPage, NewSessionPage, SessionCacheGuard, SessionDetailPage, SessionsListPage, StarredPage } from '@/components/sessions';
 
 const queryClient = new QueryClient();
 
@@ -17,6 +17,7 @@ function Router() {
       <Switch>
         <Route path="/"><Protected><HomePage /></Protected></Route>
         <Route path="/sessions"><Protected><SessionsListPage /></Protected></Route>
+        <Route path="/starred"><Protected><StarredPage /></Protected></Route>
         <Route path="/sessions/new"><Protected><NewSessionPage /></Protected></Route>
         <Route path="/sessions/:id/edit">{(p) => <Protected><EditSessionPage key={p.id} rawId={p.id} /></Protected>}</Route>
         <Route path="/sessions/:id">{(p) => <Protected><SessionDetailPage key={p.id} rawId={p.id} /></Protected>}</Route>

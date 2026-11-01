@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
-import { AlertCircle, ArrowLeft, CalendarDays, Clock, Loader2, Pencil, Plus, Trash2 } from 'lucide-react';
+import { AlertCircle, ArrowLeft, CalendarDays, Clock, Loader2, Pencil, Plus, Star, Trash2 } from 'lucide-react';
 import {
-  getGetQuestionTypesQueryKey, getGetSessionQueryKey, getListSessionsQueryKey,
+  getGetQuestionTypesQueryKey,
   useCreateSession, useDeleteSession, useGetQuestionTypes, useGetSession, useListSessions, useUpdateSession,
   type PracticeSession, type PracticeSessionDetail, type SessionInput,
 } from '@workspace/api-client-react';
@@ -13,6 +13,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import { sessionRequestOptions, useAuth } from '@/auth';
 import { AppHeader } from './ip';
+import { detailKey, listKey, starredKey, statusOf } from './session-keys';
+import { STAR_ERROR, StarButton, useStarToggle, type StarToggle } from './session-stars';
 import { ScorecardEditor, ScorecardView, draftsFrom, draftsToInput, useCaseSections, type ScoreDrafts } from './scorecard';
 
 const FORMATS = [
@@ -23,7 +25,6 @@ const FORMATS = [
 const SCORE_LABEL = ['', 'Struggled', 'Shaky', 'Solid', 'Strong', 'Excellent'];
 const MAX_INT = 2147483647;
 
-const statusOf = (e: unknown) => (e && typeof e === 'object' && 'status' in e ? (e as { status: number }).status : undefined);
 
 function use401(error: unknown) {
   const { refresh } = useAuth();
@@ -45,8 +46,6 @@ export function SessionCacheGuard() {
   return null;
 }
 
-const listKey = (uid?: number) => [...getListSessionsQueryKey(), uid] as const;
-const detailKey = (id: number, uid?: number) => [...getGetSessionQueryKey(id), uid] as const;
 
 function fmtDate(d: string) {
   return new Date(`${d}T00:00:00Z`).toLocaleDateString(undefined, { timeZone: 'UTC', year: 'numeric', month: 'short', day: 'numeric' });
@@ -111,15 +110,41 @@ function KindTag({ kind }: { kind: string }) {
   );
 }
 
+function SessionCards({ data, star }: { data: PracticeSession[]; star: StarToggle }) {
+  return (
+    <ul className="mt-8 space-y-3" aria-label="Practice sessions">
+      {data.map((s, i) => (
+        <li key={s.id} className="ip-rise relative" style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}>
+          <Link href={`/sessions/${s.id}`} data-testid={`card-session-${s.id}`}
+            className="ip-focus group block rounded-xl border bg-white p-4 pr-16 sm:p-5 sm:pr-20 transition-colors hover:border-[color:var(--navy)]"
+            style={{ borderLeft: `4px solid var(--score-${s.overall_score})` }}>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
+              <span className="inline-flex items-center gap-1.5 font-semibold"><CalendarDays className="h-4 w-4" aria-hidden />{fmtDate(s.session_date)}</span>
+              <KindTag kind={s.kind} />
+              <span className="text-muted-foreground">{s.question_type_name}</span>
+              <span className="ml-auto inline-flex items-center gap-2"><ScoreBar score={s.overall_score} /><span className="rounded-full px-2.5 py-1 font-semibold tabular-nums text-white" style={{ background: `var(--score-${s.overall_score})` }}>{s.overall_score}/5</span></span>
+            </div>
+            <p className="mt-2.5 font-medium line-clamp-2 break-words group-hover:underline underline-offset-4">{s.prompt}</p>
+            <p className="mt-1.5 text-xs text-muted-foreground">{fmtLabel(s.format)}{s.duration_minutes != null ? ` / ${s.duration_minutes} min` : ''}</p>
+          </Link>
+          <div className="absolute top-3 right-3 sm:top-4 sm:right-4"><StarButton session={s} star={star} /></div>
+          {star.errors[s.id] && <div className="px-4 pt-2" data-testid={`status-star-error-${s.id}`}><ErrText>{star.errors[s.id]}</ErrText></div>}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 /* ---------------- List ---------------- */
 
 export function SessionsListPage() {
   const { user } = useAuth();
-  const q = useListSessions({
+  const q = useListSessions(undefined, {
     query: { queryKey: listKey(user?.id), enabled: !!user, refetchOnMount: 'always', retry: false },
     request: sessionRequestOptions(),
   });
   use401(q.error);
+  const star = useStarToggle();
   const data = q.data;
   return (
     <Shell title="Practice sessions">
@@ -140,7 +165,7 @@ export function SessionsListPage() {
         <div className="mt-8 space-y-3" aria-busy="true"><span className="sr-only" role="status">Loading sessions</span>
           {[0, 1, 2].map(i => <div key={i} className="ip-skel h-24 rounded-xl" />)}
         </div>
-      ) : q.error ? (
+      ) : q.error && !data ? (
         <ErrorPanel msg="Unable to load your sessions. Please try again." busy={q.isFetching} onRetry={() => void q.refetch()} />
       ) : data && data.length === 0 ? (
         <div className="ip-rise mt-8 rounded-xl p-8 sm:p-12 text-center" style={{ background: 'var(--panel)' }} data-testid="status-empty">
@@ -151,26 +176,43 @@ export function SessionsListPage() {
             <Plus className="h-4 w-4" aria-hidden />Log your first session
           </Link>
         </div>
-      ) : data ? (
-        <ul className="mt-8 space-y-3" aria-label="Practice sessions">
-          {data.map((s, i) => (
-            <li key={s.id} className="ip-rise" style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}>
-              <Link href={`/sessions/${s.id}`} data-testid={`card-session-${s.id}`}
-                className="ip-focus group block rounded-xl border bg-white p-4 sm:p-5 transition-colors hover:border-[color:var(--navy)]"
-                style={{ borderLeft: `4px solid var(--score-${s.overall_score})` }}>
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
-                  <span className="inline-flex items-center gap-1.5 font-semibold"><CalendarDays className="h-4 w-4" aria-hidden />{fmtDate(s.session_date)}</span>
-                  <KindTag kind={s.kind} />
-                  <span className="text-muted-foreground">{s.question_type_name}</span>
-                  <span className="ml-auto inline-flex items-center gap-2"><ScoreBar score={s.overall_score} /><span className="rounded-full px-2.5 py-1 font-semibold tabular-nums text-white" style={{ background: `var(--score-${s.overall_score})` }}>{s.overall_score}/5</span></span>
-                </div>
-                <p className="mt-2.5 font-medium line-clamp-2 break-words group-hover:underline underline-offset-4">{s.prompt}</p>
-                <p className="mt-1.5 text-xs text-muted-foreground">{fmtLabel(s.format)}{s.duration_minutes != null ? ` / ${s.duration_minutes} min` : ''}</p>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      ) : null}
+      ) : data ? <SessionCards data={data} star={star} /> : null}
+    </Shell>
+  );
+}
+
+export function StarredPage() {
+  const { user } = useAuth();
+  const q = useListSessions({ starred: true }, {
+    query: { queryKey: starredKey(user?.id), enabled: !!user, refetchOnMount: 'always', retry: false },
+    request: sessionRequestOptions(),
+  });
+  use401(q.error);
+  const star = useStarToggle();
+  const data = q.data;
+  // Errors for cards no longer shown (e.g. removed from this list) stay visible here.
+  const orphanErr = Object.keys(star.errors).some(id => !data?.some(s => String(s.id) === id));
+  return (
+    <Shell title="Starred">
+      <div className="ip-rise">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--green-text)' }}>Redo list</p>
+        <h1 className="mt-2 text-3xl sm:text-4xl font-bold tracking-tight">Starred</h1>
+        <p className="mt-2 text-sm text-muted-foreground" data-testid="text-starred-subtitle">Your redo list</p>
+      </div>
+      {orphanErr && <div className="mt-6 rounded-lg border-l-4 bg-white p-3" style={{ borderColor: 'var(--score-1)' }} data-testid="status-star-error"><ErrText>{STAR_ERROR}</ErrText></div>}
+      {q.isLoading ? (
+        <div className="mt-8 space-y-3" aria-busy="true"><span className="sr-only" role="status">Loading starred sessions</span>
+          {[0, 1].map(i => <div key={i} className="ip-skel h-24 rounded-xl" />)}
+        </div>
+      ) : q.error && !data ? (
+        <ErrorPanel msg="Unable to load your starred sessions. Please try again." busy={q.isFetching} onRetry={() => void q.refetch()} />
+      ) : data && data.length === 0 ? (
+        <div className="ip-rise mt-8 rounded-xl p-8 sm:p-12 text-center" style={{ background: 'var(--panel)' }} data-testid="status-empty-starred">
+          <Star className="mx-auto h-8 w-8" aria-hidden style={{ color: '#1F2A44' }} />
+          <p className="mt-4 font-semibold">No starred sessions yet. Star a session you want to redo.</p>
+          <Link href="/sessions" className="ip-focus mt-6 min-h-11 px-5 rounded-lg inline-flex items-center gap-2 font-semibold text-white" style={{ background: 'var(--navy)' }}>Browse your sessions</Link>
+        </div>
+      ) : data ? <SessionCards data={data} star={star} /> : null}
     </Shell>
   );
 }
@@ -212,6 +254,7 @@ export function SessionDetailPage({ rawId }: { rawId?: string }) {
   const [delErr, setDelErr] = useState('');
   const del = useDeleteSession({ request: sessionRequestOptions() });
   use401(del.error);
+  const star = useStarToggle();
 
   function confirmDelete() {
     if (id === null) return;
@@ -220,12 +263,13 @@ export function SessionDetailPage({ rawId }: { rawId?: string }) {
       onSuccess: () => {
         qc.removeQueries({ queryKey: detailKey(id, user?.id) });
         qc.setQueryData<PracticeSession[]>(listKey(user?.id), old => old?.filter(s => s.id !== id));
-        void qc.invalidateQueries({ queryKey: listKey(user?.id) });
+        qc.setQueryData<PracticeSession[]>(starredKey(user?.id), old => old?.filter(s => s.id !== id));
+        void qc.invalidateQueries({ queryKey: listKey(user?.id) }); void qc.invalidateQueries({ queryKey: starredKey(user?.id) });
         setOpen(false);
         nav('/sessions');
       },
       onError: (e) => {
-        if (statusOf(e) === 404) { setOpen(false); qc.removeQueries({ queryKey: detailKey(id, user?.id) }); void qc.invalidateQueries({ queryKey: listKey(user?.id) }); nav('/sessions'); return; }
+        if (statusOf(e) === 404) { setOpen(false); qc.removeQueries({ queryKey: detailKey(id, user?.id) }); void qc.invalidateQueries({ queryKey: listKey(user?.id) }); void qc.invalidateQueries({ queryKey: starredKey(user?.id) }); nav('/sessions'); return; }
         setOpen(false);
         setDelErr('Unable to delete this session. Please try again.');
       },
@@ -253,6 +297,7 @@ export function SessionDetailPage({ rawId }: { rawId?: string }) {
               <h1 className="mt-3 text-2xl sm:text-3xl font-bold tracking-tight break-words whitespace-pre-wrap" data-testid="text-prompt">{s.prompt}</h1>
             </div>
             <div className="flex gap-2 shrink-0">
+              <StarButton session={s} star={star} />
               <Link href={`/sessions/${s.id}/edit`} data-testid="link-edit-session"
                 className="ip-focus min-h-11 flex-1 lg:flex-none px-4 rounded-lg inline-flex items-center justify-center gap-2 font-semibold border bg-white hover:border-[color:var(--navy)]">
                 <Pencil className="h-4 w-4" aria-hidden />Edit
@@ -264,6 +309,7 @@ export function SessionDetailPage({ rawId }: { rawId?: string }) {
               </button>
             </div>
           </header>
+          {star.errors[s.id] && <div className="mt-4 rounded-lg border-l-4 bg-white p-3" style={{ borderColor: 'var(--score-1)' }} data-testid="status-star-error"><ErrText>{star.errors[s.id]}</ErrText></div>}
           {delErr && <div className="mt-4 rounded-lg border-l-4 bg-white p-3" style={{ borderColor: 'var(--score-1)' }}><ErrText>{delErr}</ErrText></div>}
 
           <dl className="ip-rise mt-8 grid grid-cols-2 lg:grid-cols-4 rounded-xl overflow-hidden" style={{ background: 'var(--panel)', animationDelay: '60ms' }}>
@@ -597,7 +643,7 @@ export function NewSessionPage() {
         onSubmit={(data) => create.mutate({ data }, {
           onSuccess: (s) => {
             qc.setQueryData(detailKey(s.id, user?.id), s);
-            void qc.invalidateQueries({ queryKey: listKey(user?.id) });
+            void qc.invalidateQueries({ queryKey: listKey(user?.id) }); void qc.invalidateQueries({ queryKey: starredKey(user?.id) });
             nav(`/sessions/${s.id}`);
           },
           onError: (e) => setSrvErr(serverErrs(e)),
@@ -644,7 +690,7 @@ export function EditSessionPage({ rawId }: { rawId?: string }) {
             onSubmit={(data) => update.mutate({ id, data }, {
               onSuccess: (s) => {
                 qc.setQueryData(detailKey(s.id, user?.id), s);
-                void qc.invalidateQueries({ queryKey: listKey(user?.id) });
+                void qc.invalidateQueries({ queryKey: listKey(user?.id) }); void qc.invalidateQueries({ queryKey: starredKey(user?.id) });
                 snap.current = null;
                 nav(`/sessions/${s.id}`);
               },

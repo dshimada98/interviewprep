@@ -4,7 +4,8 @@ import { replaceSectionScores } from './case-sections.mjs';
 import { validateSession } from './session-validation.mjs';
 const fields = `s.id, s.question_type_id, s.session_date::text, s.prompt, s.format,
   s.overall_score, s.duration_minutes, s.went_well, s.to_improve, s.created_at,
-  q.name AS question_type_name, q.kind`;
+  q.name AS question_type_name, q.kind,
+  EXISTS (SELECT 1 FROM stars st WHERE st.session_id=s.id AND st.user_id=s.user_id) AS starred`;
 const notFound = res => res.status(404).json({ message: 'Session not found' });
 
 async function validated(body, res, database) {
@@ -52,7 +53,10 @@ export const practiceSessions = Router();
 practiceSessions.get('/', async (req, res) => {
   const result = await pool.query(`SELECT ${fields} FROM practice_sessions s
     JOIN question_types q ON q.id=s.question_type_id WHERE s.user_id=$1
-    ORDER BY s.session_date DESC, s.created_at DESC, s.id DESC`, [req.user.id]);
+    AND ($2::boolean = false OR EXISTS (
+      SELECT 1 FROM stars st WHERE st.session_id=s.id AND st.user_id=$1
+    ))
+    ORDER BY s.session_date DESC, s.created_at DESC, s.id DESC`, [req.user.id, req.query.starred === 'true']);
   res.json(result.rows);
 });
 practiceSessions.post('/', async (req, res) => {
@@ -72,6 +76,26 @@ practiceSessions.use('/:id', (req, res, next) => {
   if (!/^[1-9]\d*$/.test(req.params.id) || Number(req.params.id) > 2147483647) return notFound(res);
   next();
 });
+async function setStar(req, res, starred) {
+  const found = await sessionTransaction(async database => {
+    // Serialize star/unstar with session edits/deletion and establish ownership
+    // before touching the junction table. Client-supplied user_id is never used.
+    const owned = await database.query('SELECT id FROM practice_sessions WHERE id=$1 AND user_id=$2 FOR UPDATE',
+      [req.params.id, req.user.id]);
+    if (!owned.rowCount) return false;
+    if (starred) {
+      await database.query('INSERT INTO stars (user_id, session_id) VALUES ($1,$2) ON CONFLICT (user_id, session_id) DO NOTHING',
+        [req.user.id, req.params.id]);
+    } else {
+      await database.query('DELETE FROM stars WHERE user_id=$1 AND session_id=$2', [req.user.id, req.params.id]);
+    }
+    return true;
+  });
+  if (!found) return notFound(res);
+  res.status(204).end();
+}
+practiceSessions.post('/:id/star', (req, res) => setStar(req, res, true));
+practiceSessions.delete('/:id/star', (req, res) => setStar(req, res, false));
 practiceSessions.get('/:id', async (req, res) => {
   const saved = await readSession(pool, req.params.id, req.user.id);
   if (!saved) return notFound(res);

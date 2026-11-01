@@ -19,6 +19,10 @@ export const GetCaseSectionsResponseItem = zod.object({
 export const GetCaseSectionsResponse = zod.array(GetCaseSectionsResponseItem)
 
 
+export const ListSessionsQueryParams = zod.object({
+  "starred": zod.coerce.boolean().optional().describe('When true, return only the current user\'s starred sessions.')
+})
+
 export const listSessionsResponseOneSectionScoresItemSectionIdMax = 2147483647;
 
 export const listSessionsResponseOneSectionScoresItemScoreMax = 5;
@@ -60,6 +64,7 @@ export const ListSessionsResponseItem = zod.object({
   "went_well": zod.string().max(listSessionsResponseOneWentWellMax).nullish(),
   "to_improve": zod.string().max(listSessionsResponseOneToImproveMax).nullish()
 }).and(zod.object({
+  "starred": zod.boolean(),
   "id": zod.number().int(),
   "question_type_name": zod.string(),
   "kind": zod.enum(['case', 'behavioral']),
@@ -159,6 +164,7 @@ export const CreateSessionResponse = zod.object({
   "went_well": zod.string().max(createSessionResponseOneOneWentWellMax).nullish(),
   "to_improve": zod.string().max(createSessionResponseOneOneToImproveMax).nullish()
 }).and(zod.object({
+  "starred": zod.boolean(),
   "id": zod.number().int(),
   "question_type_name": zod.string(),
   "kind": zod.enum(['case', 'behavioral']),
@@ -175,6 +181,26 @@ export const CreateSessionResponse = zod.object({
   "display_order": zod.number().int()
 })))
 }))
+
+
+/**
+ * @summary Star an owned session, idempotently
+ */
+export const StarSessionParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const StarSessionResponse = zod.void()
+
+
+/**
+ * @summary Unstar an owned session, idempotently
+ */
+export const UnstarSessionParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const UnstarSessionResponse = zod.void()
 
 
 export const GetSessionParams = zod.object({
@@ -230,6 +256,7 @@ export const GetSessionResponse = zod.object({
   "went_well": zod.string().max(getSessionResponseOneOneWentWellMax).nullish(),
   "to_improve": zod.string().max(getSessionResponseOneOneToImproveMax).nullish()
 }).and(zod.object({
+  "starred": zod.boolean(),
   "id": zod.number().int(),
   "question_type_name": zod.string(),
   "kind": zod.enum(['case', 'behavioral']),
@@ -343,6 +370,7 @@ export const UpdateSessionResponse = zod.object({
   "went_well": zod.string().max(updateSessionResponseOneOneWentWellMax).nullish(),
   "to_improve": zod.string().max(updateSessionResponseOneOneToImproveMax).nullish()
 }).and(zod.object({
+  "starred": zod.boolean(),
   "id": zod.number().int(),
   "question_type_name": zod.string(),
   "kind": zod.enum(['case', 'behavioral']),

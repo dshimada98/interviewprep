@@ -31,6 +31,12 @@ paths:
     get:
       operationId: listSessions
       security: [{sessionCookie: []}]
+      parameters:
+        - in: query
+          name: starred
+          description: When true, return only the current user's starred sessions.
+          schema:
+            type: boolean
       responses:
         "200":
           description: Current user's sessions, newest date first
@@ -58,6 +64,35 @@ paths:
                 $ref: "#/components/schemas/PracticeSessionDetail"
         "400":
           $ref: "#/components/responses/InvalidSession"
+  /sessions/{id}/star:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+    post:
+      operationId: starSession
+      summary: Star an owned session, idempotently
+      security: [{sessionCookie: []}]
+      responses:
+        "204":
+          description: Starred, including when already starred
+        "401":
+          description: Login required
+        "404":
+          description: Session not found
+    delete:
+      operationId: unstarSession
+      summary: Unstar an owned session, idempotently
+      security: [{sessionCookie: []}]
+      responses:
+        "204":
+          description: Unstarred, including when already unstarred
+        "401":
+          description: Login required
+        "404":
+          description: Session not found
   /sessions/{id}:
     parameters:
       - in: path
@@ -250,8 +285,10 @@ components:
       allOf:
         - $ref: "#/components/schemas/SessionInput"
         - type: object
-          required: [id, question_type_name, kind, created_at]
+          required: [id, question_type_name, kind, created_at, starred]
           properties:
+            starred:
+              type: boolean
             id:
               type: integer
             question_type_name:

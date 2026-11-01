@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, Redirect, useLocation } from 'wouter';
-import { Menu, X, LogOut, AlertCircle, Loader2, ListChecks, ArrowRight } from 'lucide-react';
+import { Menu, X, LogOut, AlertCircle, Loader2, ListChecks, ArrowRight, Star } from 'lucide-react';
 import { useAuth, messages } from '@/auth';
 import { PracticeAreas } from './practice-areas';
 
@@ -200,20 +200,22 @@ export function AppHeader() {
     <header className="text-white" style={{ background: 'var(--navy)' }}>
       <div className="max-w-5xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between">
         <Link href="/" className="ip-focus min-h-11 inline-flex items-center rounded"><Mark /></Link>
-        <div className="hidden sm:flex items-center gap-4">
+        <div className="hidden lg:flex items-center gap-4">
           <Link href="/sessions" data-testid="link-nav-sessions" className="ip-focus min-h-11 px-3 rounded-lg inline-flex items-center gap-2 font-semibold hover:bg-white/10"><ListChecks className="h-4 w-4" aria-hidden />Sessions</Link>
+          <Link href="/starred" data-testid="link-nav-starred" className="ip-focus min-h-11 px-3 rounded-lg inline-flex items-center gap-2 font-semibold hover:bg-white/10"><Star className="h-4 w-4" aria-hidden />Starred</Link>
           <Link href="/sessions/new" data-testid="link-nav-log-session" className="ip-focus min-h-11 px-3 rounded-lg inline-flex items-center justify-center font-semibold border border-white/30">+ Log session</Link>
-          <span className="hidden lg:inline text-sm text-white/75 truncate max-w-[12rem]">{user?.email}</span>
+          <span className="text-sm text-white/75 truncate max-w-[12rem]">{user?.email}</span>
           {btn}
         </div>
-        <button className="sm:hidden ip-focus h-11 w-11 grid place-items-center rounded-lg border border-white/30"
+        <button className="lg:hidden ip-focus h-11 w-11 grid place-items-center rounded-lg border border-white/30"
           aria-label={open ? 'Close menu' : 'Open menu'} aria-expanded={open} aria-controls="mobile-menu" onClick={() => setOpen(!open)}>
           {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </button>
       </div>
       {open && (
-        <div id="mobile-menu" className="sm:hidden px-5 pb-4 space-y-3 ip-rise">
+        <div id="mobile-menu" className="lg:hidden px-5 pb-4 space-y-3 ip-rise">
           <Link href="/sessions" onClick={() => setOpen(false)} className="ip-focus min-h-11 w-full rounded-lg inline-flex items-center justify-center gap-2 font-semibold border border-white/30"><ListChecks className="h-4 w-4" aria-hidden />Sessions</Link>
+          <Link href="/starred" onClick={() => setOpen(false)} data-testid="link-mobile-starred" className="ip-focus min-h-11 w-full rounded-lg inline-flex items-center justify-center gap-2 font-semibold border border-white/30"><Star className="h-4 w-4" aria-hidden />Starred</Link>
           <Link href="/sessions/new" onClick={() => setOpen(false)} className="ip-focus min-h-11 w-full rounded-lg inline-flex items-center justify-center font-semibold border border-white/30">+ Log session</Link>
           <p className="text-sm text-white/75 break-all">{user?.email}</p>
           <div className="[&>button]:w-full [&>button]:justify-center">{btn}</div>

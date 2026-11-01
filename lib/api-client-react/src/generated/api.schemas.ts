@@ -104,6 +104,7 @@ export const PracticeSessionKind = {
 } as const;
 
 export type PracticeSession = SessionInput & {
+  starred: boolean;
   id: number;
   question_type_name: string;
   kind: PracticeSessionKind;
@@ -148,6 +149,13 @@ export interface HealthStatus {
  * Invalid session fields
  */
 export type InvalidSessionResponse = SessionValidationError;
+
+export type ListSessionsParams = {
+/**
+ * When true, return only the current user's starred sessions.
+ */
+starred?: boolean;
+};
 
 export type GetQuestionTypes401 = {
   message: string;
