@@ -228,8 +228,13 @@ components:
   schemas:
     DashboardSummary:
       type: object
-      required: [total_cases, average_case_score, weakest_case_type, behavioral_sessions, cases_by_type, section_averages, heatmap]
+      required: [total_cases, average_case_score, weakest_case_type, behavioral_sessions, cases_by_type, section_averages, heatmap, next_case_focus]
       properties:
+        next_case_focus:
+          type: array
+          maxItems: 2
+          items:
+            $ref: "#/components/schemas/NextCaseFocusSection"
         total_cases:
           type: integer
         average_case_score:
@@ -250,6 +255,38 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/DashboardHeatmapSession"
+    NextCaseFocusSection:
+      type: object
+      required: [section_id, section_name, average_score, scored_count, case_count, note]
+      properties:
+        section_id:
+          type: integer
+        section_name:
+          type: string
+        average_score:
+          type: number
+          description: Average of scored rows in the five-case window, rounded to one decimal.
+        scored_count:
+          type: integer
+          description: Number of cases in the window that scored this section; excludes N/A.
+        case_count:
+          type: integer
+          description: Number of cases in the window, at most five; used for the last N cases label.
+        note:
+          $ref: "#/components/schemas/NextCaseFocusNote"
+    NextCaseFocusNote:
+      type: [object, "null"]
+      required: [text, session_id, session_date, prompt]
+      properties:
+        text:
+          type: string
+        session_id:
+          type: integer
+        session_date:
+          type: string
+          format: date
+        prompt:
+          type: string
     DashboardWeakestType:
       type: [object, "null"]
       required: [name, average_score]

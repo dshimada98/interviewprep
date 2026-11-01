@@ -24,8 +24,31 @@ export async function getDashboard(userId) {
       GROUP BY s.id, s.name, s.display_order
     ), recent AS (
       SELECT * FROM cases ORDER BY session_date DESC, created_at DESC, id DESC LIMIT 10
+    ), focus_cases AS MATERIALIZED (
+      SELECT * FROM recent ORDER BY session_date DESC, created_at DESC, id DESC LIMIT 5
+    ), focus_sections AS (
+      SELECT s.id, s.name, s.display_order, round(avg(sc.score), 1) AS average_score,
+        count(sc.score)::int AS scored_count
+      FROM section_scores sc JOIN focus_cases c ON c.id = sc.session_id
+      JOIN case_sections s ON s.id = sc.section_id
+      GROUP BY s.id, s.name, s.display_order
+      ORDER BY average_score, scored_count DESC, s.display_order, s.id
+      LIMIT 2
     )
     SELECT
+      (SELECT coalesce(jsonb_agg(jsonb_build_object(
+          'section_id', f.id, 'section_name', f.name, 'average_score', f.average_score,
+          'scored_count', f.scored_count, 'case_count', (SELECT count(*)::int FROM focus_cases),
+          'note', n.note
+        ) ORDER BY f.average_score, f.scored_count DESC, f.display_order, f.id), '[]'::jsonb)
+        FROM focus_sections f LEFT JOIN LATERAL (
+          SELECT jsonb_build_object('text', sc.to_improve, 'session_id', c.id,
+            'session_date', c.session_date, 'prompt', c.prompt) AS note
+          FROM cases c JOIN section_scores sc ON sc.session_id = c.id
+          WHERE sc.section_id = f.id AND sc.to_improve ~ '[^[:space:]]'
+          ORDER BY c.session_date DESC, c.created_at DESC, c.id DESC
+          LIMIT 1
+        ) n ON true) AS next_case_focus,
       (SELECT count(*)::int FROM cases) AS total_cases,
       (SELECT round(avg(overall_score), 1) FROM cases)::float8 AS average_case_score,
       (SELECT jsonb_build_object('name', name, 'average_score', round(average, 1))

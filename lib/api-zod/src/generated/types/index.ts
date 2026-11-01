@@ -21,6 +21,8 @@ export * from './listSessionsKind';
 export * from './listSessionsParams';
 export * from './listSessionsScore';
 export * from './listSessionsSort';
+export * from './nextCaseFocusNote';
+export * from './nextCaseFocusSection';
 export * from './practiceSession';
 export * from './practiceSessionDetail';
 export * from './practiceSessionKind';

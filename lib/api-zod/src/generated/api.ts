@@ -11,7 +11,24 @@ import * as zod from 'zod';
 /**
  * @summary Private practice dashboard computed from owned sessions
  */
+export const getDashboardResponseNextCaseFocusMax = 2;
+
+
+
 export const GetDashboardResponse = zod.object({
+  "next_case_focus": zod.array(zod.object({
+  "section_id": zod.number().int(),
+  "section_name": zod.string(),
+  "average_score": zod.number().describe('Average of scored rows in the five-case window, rounded to one decimal.'),
+  "scored_count": zod.number().int().describe('Number of cases in the window that scored this section; excludes N/A.'),
+  "case_count": zod.number().int().describe('Number of cases in the window, at most five; used for the last N cases label.'),
+  "note": zod.object({
+  "text": zod.string(),
+  "session_id": zod.number().int(),
+  "session_date": zod.coerce.date(),
+  "prompt": zod.string()
+}).nullable()
+})).max(getDashboardResponseNextCaseFocusMax),
   "total_cases": zod.number().int(),
   "average_case_score": zod.number().nullable(),
   "weakest_case_type": zod.object({
