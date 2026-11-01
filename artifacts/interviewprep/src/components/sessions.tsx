@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
-import { Link, useLocation } from 'wouter';
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { Link, useLocation, useSearch } from 'wouter';
 import { keepPreviousData, useQueryClient } from '@tanstack/react-query';
-import { AlertCircle, ArrowLeft, CalendarDays, Clock, Loader2, Pencil, Plus, Search, Star, Trash2 } from 'lucide-react';
+import { AlertCircle, ArrowLeft, BookOpen, CalendarDays, Clock, Loader2, Pencil, Plus, Search, Star, Trash2 } from 'lucide-react';
 import {
   getGetQuestionTypesQueryKey,
-  useCreateSession, useDeleteSession, useGetQuestionTypes, useGetSession, useListSessions, useUpdateSession,
+  useCreateSession, useDeleteSession, useGetQuestionTypes, useGetSession, useGetStory, useListSessions, useUpdateSession,
   type PracticeSession, type PracticeSessionDetail, type SessionInput,
 } from '@workspace/api-client-react';
 import {
@@ -13,7 +13,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import { sessionRequestOptions, useAuth } from '@/auth';
 import { AppHeader } from './ip';
-import { detailKey, invalidateLists, listKey, removeFromLists, starredKey, statusOf } from './session-keys';
+import { detailKey, invalidateLists, listKey, removeFromLists, starredKey, statusOf, storyDetailKey } from './session-keys';
+import { StorySelect } from './story-select';
 import { ClearFilters, FinderControls, useSessionFinder } from './session-finder';
 import { STAR_ERROR, StarButton, useStarToggle, type StarToggle } from './session-stars';
 import { ScorecardEditor, ScorecardView, draftsFrom, draftsToInput, useCaseSections, type ScoreDrafts } from './scorecard';
@@ -27,7 +28,7 @@ const SCORE_LABEL = ['', 'Struggled', 'Shaky', 'Solid', 'Strong', 'Excellent'];
 const MAX_INT = 2147483647;
 
 
-function use401(error: unknown) {
+export function use401(error: unknown) {
   const { refresh } = useAuth();
   useEffect(() => { if (statusOf(error) === 401) void refresh(); }, [error, refresh]);
 }
@@ -48,12 +49,12 @@ export function SessionCacheGuard() {
 }
 
 
-function fmtDate(d: string) {
+export function fmtDate(d: string) {
   return new Date(`${d}T00:00:00Z`).toLocaleDateString(undefined, { timeZone: 'UTC', year: 'numeric', month: 'short', day: 'numeric' });
 }
 const fmtLabel = (f: string) => FORMATS.find(x => x.v === f)?.label ?? f;
 
-function Shell({ children, title }: { children: ReactNode; title: string }) {
+export function Shell({ children, title }: { children: ReactNode; title: string }) {
   useEffect(() => { document.title = `${title} | InterviewPrep`; }, [title]);
   return (
     <div className="min-h-[100dvh]">
@@ -63,7 +64,7 @@ function Shell({ children, title }: { children: ReactNode; title: string }) {
   );
 }
 
-function ErrText({ children, id }: { children: ReactNode; id?: string }) {
+export function ErrText({ children, id }: { children: ReactNode; id?: string }) {
   return (
     <p id={id} role="alert" className="flex items-start gap-2 text-sm font-medium" style={{ color: '#C0392B' }}>
       <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" aria-hidden /><span>{children}</span>
@@ -71,7 +72,7 @@ function ErrText({ children, id }: { children: ReactNode; id?: string }) {
   );
 }
 
-function BackLink({ href, children }: { href: string; children: ReactNode }) {
+export function BackLink({ href, children }: { href: string; children: ReactNode }) {
   return (
     <Link href={href} data-testid="link-back" className="ip-focus inline-flex min-h-11 items-center gap-2 rounded text-sm font-semibold hover:underline underline-offset-4">
       <ArrowLeft className="h-4 w-4" aria-hidden />{children}
@@ -79,7 +80,7 @@ function BackLink({ href, children }: { href: string; children: ReactNode }) {
   );
 }
 
-function ErrorPanel({ msg, onRetry, busy }: { msg: string; onRetry: () => void; busy: boolean }) {
+export function ErrorPanel({ msg, onRetry, busy }: { msg: string; onRetry: () => void; busy: boolean }) {
   return (
     <div className="ip-rise mt-6 rounded-xl p-6 border-l-4 space-y-4" style={{ background: 'var(--panel)', borderColor: 'var(--score-1)' }}>
       <ErrText>{msg}</ErrText>
@@ -315,6 +316,14 @@ export function SessionDetailPage({ rawId }: { rawId?: string }) {
                 <span className="font-semibold">{s.question_type_name}</span>
               </div>
               <h1 className="mt-3 text-2xl sm:text-3xl font-bold tracking-tight break-words whitespace-pre-wrap" data-testid="text-prompt">{s.prompt}</h1>
+              {s.kind === 'behavioral' && s.story_id != null && (
+                <p className="mt-3 text-sm" data-testid="text-story-used">
+                  <span className="text-muted-foreground">Story used: </span>
+                  <Link href={`/stories/${s.story_id}`} data-testid="link-session-story" className="ip-focus inline-flex min-h-11 items-center gap-1.5 rounded font-semibold underline underline-offset-4 decoration-2 break-words" style={{ textDecorationColor: 'var(--green)' }}>
+                    <BookOpen className="h-4 w-4 shrink-0" aria-hidden />{s.story_title ?? 'Untitled story'}
+                  </Link>
+                </p>
+              )}
             </div>
             <div className="flex gap-2 shrink-0">
               <StarButton session={s} star={star} />
@@ -383,9 +392,9 @@ export function SessionDetailPage({ rawId }: { rawId?: string }) {
 
 /* ---------------- Form ---------------- */
 
-type FormVals = { scores?: ScoreDrafts; session_date: string; question_type_id: string; prompt: string; format: string; overall_score: string; duration_minutes: string; went_well: string; to_improve: string };
+type FormVals = { scores?: ScoreDrafts; session_date: string; question_type_id: string; prompt: string; format: string; overall_score: string; duration_minutes: string; went_well: string; to_improve: string; story_id: string };
 type Errs = Partial<Record<Exclude<keyof FormVals, 'scores'> | 'section_scores' | 'form', string>>;
-const EMPTY: FormVals = { session_date: '', question_type_id: '', prompt: '', format: '', overall_score: '', duration_minutes: '', went_well: '', to_improve: '' };
+const EMPTY: FormVals = { session_date: '', question_type_id: '', prompt: '', format: '', overall_score: '', duration_minutes: '', went_well: '', to_improve: '', story_id: '' };
 const SAVE_ERROR = "Couldn't save your session. Please try again.";
 const FIX_FIELDS = 'Please fix the highlighted fields.';
 
@@ -508,7 +517,7 @@ function SessionForm({ initial, submitLabel, busy, onSubmit, cancelHref, serverE
     const ids = new Set((types.data?.[activeKind] ?? []).map(t => t.id));
     const [er, input] = validate(v, ids);
     if (!input) { focusErrors.current = true; setErrs(er); return; }
-    if (activeKind === 'behavioral') { setErrs({}); onSubmit({ ...input, section_scores: [] }); return; }
+    if (activeKind === 'behavioral') { setErrs({}); onSubmit({ ...input, story_id: v.story_id ? Number(v.story_id) : null, section_scores: [] }); return; }
     // Never submit a case without the reference list; the scorecard shows a retry.
     const sc = sections.data ? draftsToInput(drafts, sections.data) : null;
     if (!sc) {
@@ -518,7 +527,7 @@ function SessionForm({ initial, submitLabel, busy, onSubmit, cancelHref, serverE
       return;
     }
     setErrs({});
-    onSubmit({ ...input, section_scores: sc });
+    onSubmit({ ...input, story_id: null, section_scores: sc });
   }
 
   const counter = (s: string) => <span className="tabular-nums">{s.trim().length}/4000</span>;
@@ -536,7 +545,7 @@ function SessionForm({ initial, submitLabel, busy, onSubmit, cancelHref, serverE
             onClick={() => {
               if (activeKind !== k) {
                 setKind(k);
-                setV(p => ({ ...p, question_type_id: '' }));
+                setV(p => ({ ...p, question_type_id: '', story_id: '' }));
                 setErrs(previous => {
                   const next = { ...previous };
                   delete next.section_scores;
@@ -570,6 +579,10 @@ function SessionForm({ initial, submitLabel, busy, onSubmit, cancelHref, serverE
             )}
         </FieldWrap>
       </div>
+
+      {activeKind === 'behavioral' && types.data && (
+        <StorySelect value={v.story_id} onChange={set('story_id')} typeId={v.question_type_id} disabled={busy} error={errs.story_id} />
+      )}
 
       <FieldWrap id="prompt" label="Prompt" error={errs.prompt} hint="The case question or behavioral prompt you practiced.">
         <textarea {...aria('prompt', errs.prompt, true)} data-testid="input-prompt" rows={3} className={`${inputCls} py-2.5`}
@@ -654,12 +667,37 @@ export function NewSessionPage() {
   const [srvErr, setSrvErr] = useState<Errs>({});
   const create = useCreateSession({ request: sessionRequestOptions() });
   use401(create.error);
-  const initial = useRef<FormVals>({ ...EMPTY, session_date: today() });
+  // "Practice this story" prefill: ?story=<id>. Strictly parsed, then validated against the real owned story.
+  const search = useSearch();
+  const rawStory = new URLSearchParams(search).get('story') ?? undefined;
+  const storyId = useSessionId(rawStory);
+  const story = useGetStory(storyId ?? 0, {
+    query: { queryKey: storyDetailKey(storyId ?? 0, user?.id), enabled: !!user && storyId !== null, retry: false },
+    request: sessionRequestOptions(),
+  });
+  use401(story.error);
+  const types = useGetQuestionTypes({
+    query: { queryKey: [...getGetQuestionTypesQueryKey(), user?.id], enabled: !!user && storyId !== null, retry: false },
+    request: sessionRequestOptions(),
+  });
+  const sd = story.data;
+  const prefillOk = !!sd && !!types.data?.behavioral.some(t => t.id === sd.competency_id);
+  const initial = useMemo<FormVals>(() => ({
+    ...EMPTY, session_date: today(),
+    ...(prefillOk && sd ? { question_type_id: String(sd.competency_id), story_id: String(sd.id) } : {}),
+  }), [prefillOk, sd]);
+  const waiting = storyId !== null && (story.isLoading || (!!sd && types.isLoading));
+  const prefillFailed = rawStory !== undefined && !waiting && !prefillOk;
   return (
     <Shell title="Log a session">
-      <BackLink href="/sessions">All sessions</BackLink>
+      <BackLink href={prefillOk && sd ? `/stories/${sd.id}` : '/sessions'}>{prefillOk ? 'Back to story' : 'All sessions'}</BackLink>
       <h1 className="ip-rise mt-3 text-3xl font-bold tracking-tight">Log a session</h1>
-      <SessionForm initial={initial.current} submitLabel="Save session" busy={create.isPending} cancelHref="/sessions" serverErrors={srvErr}
+      {prefillOk && sd && <p className="mt-2 text-sm text-muted-foreground break-words" data-testid="text-practice-story">Practicing your story <span className="font-semibold" style={{ color: 'var(--navy)' }}>{sd.title}</span></p>}
+      {prefillFailed && <div className="mt-4 rounded-lg border-l-4 bg-white p-3" style={{ borderColor: 'var(--score-3)' }} data-testid="status-prefill-missing"><ErrText>That story could not be loaded, so nothing was pre-filled.</ErrText></div>}
+      {waiting ? (
+        <div className="mt-6 space-y-4" aria-busy="true"><span className="sr-only" role="status">Loading story</span><div className="ip-skel h-96 rounded-xl" /></div>
+      ) : (
+      <SessionForm key={prefillOk ? `story-${sd?.id}` : 'blank'} initial={initial} submitLabel="Save session" busy={create.isPending} cancelHref={prefillOk && sd ? `/stories/${sd.id}` : '/sessions'} serverErrors={srvErr}
         onSubmit={(data) => create.mutate({ data }, {
           onSuccess: (s) => {
             qc.setQueryData(detailKey(s.id, user?.id), s);
@@ -668,6 +706,7 @@ export function NewSessionPage() {
           },
           onError: (e) => setSrvErr(serverErrs(e)),
         })} />
+      )}
     </Shell>
   );
 }
@@ -677,6 +716,7 @@ const toVals = (s: PracticeSessionDetail): FormVals => ({
   session_date: s.session_date, question_type_id: String(s.question_type_id), prompt: s.prompt, format: s.format,
   overall_score: String(s.overall_score), duration_minutes: s.duration_minutes == null ? '' : String(s.duration_minutes),
   went_well: s.went_well ?? '', to_improve: s.to_improve ?? '',
+  story_id: s.kind === 'behavioral' && s.story_id != null ? String(s.story_id) : '',
 });
 
 export function EditSessionPage({ rawId }: { rawId?: string }) {

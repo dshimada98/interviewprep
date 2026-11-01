@@ -9,6 +9,9 @@ import { AuthProvider } from '@/auth';
 import { AppHeader, AuthPage, GuestOnly, Protected } from '@/components/ip';
 import { DashboardPage } from '@/components/dashboard';
 import { EditSessionPage, NewSessionPage, SessionCacheGuard, SessionDetailPage, SessionsListPage, StarredPage } from '@/components/sessions';
+import { StoriesListPage } from '@/components/stories-list';
+import { EditStoryPage, NewStoryPage } from '@/components/stories-form';
+import { StoryDetailPage } from '@/components/story-detail';
 
 const queryClient = new QueryClient();
 
@@ -23,6 +26,10 @@ function Router() {
         <Route path="/sessions/new"><Protected><NewSessionPage /></Protected></Route>
         <Route path="/sessions/:id/edit">{(p) => <Protected><EditSessionPage key={p.id} rawId={p.id} /></Protected>}</Route>
         <Route path="/sessions/:id">{(p) => <Protected><SessionDetailPage key={p.id} rawId={p.id} /></Protected>}</Route>
+        <Route path="/stories"><Protected><StoriesListPage /></Protected></Route>
+        <Route path="/stories/new"><Protected><NewStoryPage /></Protected></Route>
+        <Route path="/stories/:id/edit">{(p) => <Protected><EditStoryPage key={p.id} rawId={p.id} /></Protected>}</Route>
+        <Route path="/stories/:id">{(p) => <Protected><StoryDetailPage key={p.id} rawId={p.id} /></Protected>}</Route>
         <Route path="/login"><GuestOnly><AuthPage mode="login" /></GuestOnly></Route>
         <Route path="/signup"><GuestOnly><AuthPage key="signup" mode="signup" /></GuestOnly></Route>
         <Route><Protected><AppHeader /><NotFound /></Protected></Route>

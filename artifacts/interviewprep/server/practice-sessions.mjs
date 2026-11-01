@@ -5,12 +5,14 @@ import { validateSession } from './session-validation.mjs';
 import { sessionListQuery } from './session-finder.mjs';
 const fields = `s.id, s.question_type_id, s.session_date::text, s.prompt, s.format,
   s.overall_score, s.duration_minutes, s.went_well, s.to_improve, s.created_at,
-  q.name AS question_type_name, q.kind,
+  q.name AS question_type_name, q.kind, s.story_id,
+  (SELECT st.title FROM stories st WHERE st.id=s.story_id AND st.user_id=s.user_id
+    AND q.kind='behavioral') AS story_title,
   EXISTS (SELECT 1 FROM stars st WHERE st.session_id=s.id AND st.user_id=s.user_id) AS starred`;
 const notFound = res => res.status(404).json({ message: 'Session not found' });
 
-async function validated(body, res, database) {
-  const result = await validateSession(body, database);
+async function validated(body, res, database, userId) {
+  const result = await validateSession(body, database, userId);
   if (result.errors) {
     res.status(400).json({ errors: result.errors });
     return null;
@@ -57,11 +59,11 @@ practiceSessions.get('/', async (req, res) => {
 });
 practiceSessions.post('/', async (req, res) => {
   const saved = await sessionTransaction(async database => {
-    const data = await validated(req.body, res, database);
+    const data = await validated(req.body, res, database, req.user.id);
     if (!data) return null;
     const result = await database.query(`INSERT INTO practice_sessions (user_id, question_type_id, session_date, prompt, format,
-      overall_score, duration_minutes, went_well, to_improve)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`, [req.user.id, ...data.values]);
+      overall_score, duration_minutes, went_well, to_improve, story_id)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id`, [req.user.id, ...data.values]);
     const id = result.rows[0].id;
     await replaceSectionScores(database, id, data.scores);
     return readSession(database, id, req.user.id);
@@ -103,10 +105,10 @@ practiceSessions.put('/:id', async (req, res) => {
     const owned = await database.query('SELECT id FROM practice_sessions WHERE id=$1 AND user_id=$2 FOR UPDATE',
       [req.params.id, req.user.id]);
     if (!owned.rowCount) { notFound(res); return null; }
-    const data = await validated(req.body, res, database);
+    const data = await validated(req.body, res, database, req.user.id);
     if (!data) return null;
     await database.query(`UPDATE practice_sessions SET question_type_id=$3, session_date=$4, prompt=$5, format=$6,
-      overall_score=$7, duration_minutes=$8, went_well=$9, to_improve=$10
+      overall_score=$7, duration_minutes=$8, went_well=$9, to_improve=$10, story_id=$11
       WHERE id=$1 AND user_id=$2`, [req.params.id, req.user.id, ...data.values]);
     await replaceSectionScores(database, req.params.id, data.scores);
     return readSession(database, req.params.id, req.user.id);

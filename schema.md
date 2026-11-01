@@ -1,11 +1,10 @@
-# InterviewPrep database schema — Features 1–7
+# InterviewPrep database schema — Features 1–10
 
 The application's SQL source of truth is
-`artifacts/interviewprep/server/schema.sql`. There are six product tables
+`artifacts/interviewprep/server/schema.sql`. There are seven product tables
 (`users`, `question_types`, `practice_sessions`, `case_sections`, and
-`section_scores`, and `stars`) plus the existing technical `login_sessions` table used for
-authentication. No story tables exist, and `practice_sessions` has no
-`story_id` column.
+`section_scores`, `stars`, and `stories`) plus the existing technical `login_sessions` table used for
+authentication. Behavioral practice sessions may optionally link to an owned story.
 
 ## users
 
@@ -38,13 +37,14 @@ Initial reference rows:
 
 Each practice session belongs to exactly one user. Feature 3 uses this existing
 table for the authenticated practice log, creation, detail, editing, and deletion.
-No new tables or columns are needed.
+Feature 10 adds an optional story link without replacing existing session data.
 
 | Column | PostgreSQL type | Rules |
 | --- | --- | --- |
 | id | integer (`SERIAL`) | Primary key, automatically assigned |
 | user_id | integer | Required foreign key to `users.id`; `ON DELETE CASCADE` |
 | question_type_id | integer | Required foreign key to `question_types.id` |
+| story_id | integer, nullable | Foreign key to `stories.id`, `ON DELETE SET NULL`; only an owned story on a behavioral session |
 | session_date | date | Required calendar date, no time of day |
 | prompt | text | Required |
 | format | text | Required, defaults to `solo`; database check allows `solo`, `partner`, or `mock` |
@@ -81,6 +81,10 @@ that the referenced user still exists before allowing protected API access.
 - A question type has many practice sessions. Each practice session has one
   question type.
 - All users share the question-type reference list.
+- A user has many stories. Each story belongs to exactly one user.
+- Each story has one main competency: a behavioral question type.
+- A story can be used in many behavioral sessions. A session may use one story or none.
+- Deleting a story clears the link on its sessions; it never deletes those sessions or their scores.
 - Users and practice sessions connect many-to-many through `stars`.
   The table supports many user/session pairs; the current API only permits
   starring a session the logged-in user owns.
@@ -91,6 +95,9 @@ that the referenced user still exists before allowing protected API access.
 erDiagram
     users ||--o{ practice_sessions : owns
     question_types ||--o{ practice_sessions : categorizes
+    users ||--o{ stories : owns
+    question_types ||--o{ stories : main_competency
+    stories |o--o{ practice_sessions : used_in
     practice_sessions ||--o{ section_scores : has
     case_sections ||--o{ section_scores : rates
     users ||--o{ stars : stars
@@ -110,6 +117,7 @@ erDiagram
         integer id PK
         integer user_id FK
         integer question_type_id FK
+        integer story_id FK
         date session_date
         text prompt
         text format
@@ -142,6 +150,18 @@ erDiagram
         integer session_id PK,FK
         timestamptz created_at
     }
+    stories {
+        integer id PK
+        integer user_id FK
+        integer competency_id FK
+        text title
+        text context
+        text situation
+        text task
+        text action
+        text result
+        timestamptz created_at
+    }
 ```
 
 ## Migration and automatic seeding
@@ -151,8 +171,9 @@ erDiagram
    tables/indexes without dropping existing tables or account data.
 2. **Production schema:** When the user chooses to publish, Replit's managed
    Publish process applies the development-to-production schema comparison.
-   Review that comparison to ensure all six tables exist before serving the
-   updated app. No custom production migration or startup DDL is used.
+   Review that comparison to ensure all eight tables and the new `story_id`
+   foreign key exist before serving the updated app. No custom production
+   migration or startup DDL is used.
 3. **Startup seeding, both environments:** Before opening its listening port,
    `server/index.mjs` calls `seedQuestionTypes()` and `seedCaseSections()`. Parameterized inserts
    adds missing rows with `ON CONFLICT (name) DO NOTHING`. Existing rows and IDs
@@ -448,3 +469,44 @@ characters, duplicate prevention, combined filters, invalid parameters, sort
 ties, starred combinations, and private total counts. The root data-isolation
 test also asserts User B searching for User A's “Coffee chain” prompt gets zero
 results.
+
+## STAR stories (Feature 10)
+
+| Column | PostgreSQL type | Rules |
+| --- | --- | --- |
+| id | integer (`SERIAL`) | Primary key, automatically assigned |
+| user_id | integer | Required FK to `users.id`, `ON DELETE CASCADE` |
+| competency_id | integer | Required FK to `question_types.id`; server requires a behavioral type |
+| title | text | Required, trimmed, nonblank; at most 300 characters in browser/server validation |
+| context | text, nullable | Optional context, at most 4,000 characters |
+| situation | text, nullable | Optional STAR section, at most 4,000 characters |
+| task | text, nullable | Optional STAR section, at most 4,000 characters |
+| action | text, nullable | Optional STAR section, at most 4,000 characters |
+| result | text, nullable | Optional STAR section, at most 4,000 characters |
+| created_at | timestamp with time zone | Required, defaults to `now()` |
+
+Indexes support owner/competency lookup and session-to-story lookup.
+The idempotent schema adds `practice_sessions.story_id` to existing databases
+with `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`. No existing practice data is replaced.
+
+All `/api/stories` routes sit below the login-required boundary. Story creation
+derives ownership from the server login session. GET/PUT/DELETE scope by both
+story ID and owner ID; foreign and missing stories return the same
+`404 {"message":"Story not found"}`. POST/PUT use field-level errors and behavioral
+competency validation. Writes require the existing session-bound CSRF token.
+
+`GET /api/stories?competency=id` returns the owner's stories with competency name,
+practice count and average overall score rounded to one decimal (null if never
+practiced). Detail additionally includes linked owned behavioral sessions, newest
+session date/creation time first. Statistics never include another user's sessions.
+
+Session create/update validates every supplied story ID against the logged-in
+owner inside the session transaction, holding a key-share lock through commit.
+A foreign or nonexistent ID is rejected with `errors.story_id`. A case session
+always stores a null link; converting a behavioral session to a case clears it.
+Omitted or null `story_id` on a full session PUT clears the link.
+Session list/detail responses include current `story_id` and `story_title`.
+
+The database's `ON DELETE SET NULL` preserves practice sessions, overall scores
+and stars when a story is removed. Deleting a user cascades owned stories as well
+as their existing practice data.

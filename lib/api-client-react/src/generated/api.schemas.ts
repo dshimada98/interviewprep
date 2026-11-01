@@ -5,6 +5,65 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+export interface StoryInput {
+  /**
+     * @minLength 1
+     * @maxLength 300
+     */
+  title: string;
+  /**
+     * Must reference a behavioral question type.
+     * @minimum 1
+     * @maximum 2147483647
+     */
+  competency_id: number;
+  /**
+     * @maxLength 4000
+     * @nullable
+     */
+  context?: string | null;
+  /**
+     * @maxLength 4000
+     * @nullable
+     */
+  situation?: string | null;
+  /**
+     * @maxLength 4000
+     * @nullable
+     */
+  task?: string | null;
+  /**
+     * @maxLength 4000
+     * @nullable
+     */
+  action?: string | null;
+  /**
+     * @maxLength 4000
+     * @nullable
+     */
+  result?: string | null;
+}
+
+export type StorySummary = StoryInput & ({
+  id: number;
+  competency_name: string;
+  created_at: string;
+  times_practiced: number;
+  /** @nullable */
+  average_score: number | null;
+});
+
+export interface StoryUsage {
+  id: number;
+  session_date: string;
+  prompt: string;
+  overall_score: number;
+}
+
+export type StoryDetail = StorySummary & {
+  sessions: StoryUsage[];
+};
+
 /**
  * @nullable
  */
@@ -110,6 +169,13 @@ export const SessionInputFormat = {
 
 export interface SessionInput {
   /**
+     * Optional owned story for behavioral sessions. Omitted/null clears the link; a case session always clears it.
+     * @minimum 1
+     * @maximum 2147483647
+     * @nullable
+     */
+  story_id?: number | null;
+  /**
      * Scored sections only; omit N/A sections. Empty or omitted replaces all scores with none. Nonempty scores are rejected for behavioral sessions. Sections must exist and cannot repeat.
      * @maxItems 7
      */
@@ -162,13 +228,17 @@ export const PracticeSessionKind = {
   behavioral: 'behavioral',
 } as const;
 
-export type PracticeSession = SessionInput & {
+export type PracticeSession = SessionInput & ({
+  /** @nullable */
+  story_id: number | null;
+  /** @nullable */
+  story_title: string | null;
   starred: boolean;
   id: number;
   question_type_name: string;
   kind: PracticeSessionKind;
   created_at: string;
-};
+});
 
 export interface SessionList {
   sessions: PracticeSession[];
@@ -226,6 +296,10 @@ export interface HealthStatus {
  * Invalid session fields
  */
 export type InvalidSessionResponse = SessionValidationError;
+
+export type ListStoriesParams = {
+competency?: number;
+};
 
 export type ListSessionsParams = {
 q?: string;

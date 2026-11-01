@@ -1,10 +1,11 @@
 # InterviewPrep
 
 InterviewPrep is a consulting case and behavioral interview preparation tracker.
-Features 1–9 cover custom email/password authentication, shared practice areas,
+Features 1–10 cover custom email/password authentication, shared practice areas,
 private session CRUD, the seven-section case scorecard, field-level validation,
 private starred-session redo lists, database-backed session search/filter/sort,
-and the private practice dashboard with next-case focus. Stories are not included.
+the private practice dashboard with next-case focus, and a private STAR story bank
+linked to behavioral practice sessions.
 
 ## Run & Operate
 
@@ -12,7 +13,7 @@ and the private practice dashboard with next-case focus. Stories are not include
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- `npm test` (or `pnpm test`) — authentication, data-model, session CRUD/validation, scorecard, stars, search/filter/sort, production-settings checks, and the root Vitest data-isolation, dashboard, and next-case focus tests against PostgreSQL
+- `npm test` (or `pnpm test`) — authentication, data-model, session CRUD/validation, scorecard, stars, search/filter/sort, production-settings checks, and the root Vitest data-isolation, dashboard, next-case focus, and story-bank tests against PostgreSQL
 - `tests/data-isolation.test.ts` imports the Express app directly; no running web server is required. Test users have unique emails and are removed afterward with their sessions.
 - `pnpm --filter @workspace/interviewprep test:browser` — real browser flows against the running product
 - Required env: `DATABASE_URL` and `SESSION_SECRET` (never print values)

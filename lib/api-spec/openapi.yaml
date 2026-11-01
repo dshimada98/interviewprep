@@ -11,6 +11,89 @@ tags:
   - name: health
     description: Health operations
 paths:
+  /stories:
+    get:
+      operationId: listStories
+      security: [{sessionCookie: []}]
+      parameters:
+        - in: query
+          name: competency
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Owned stories and private practice statistics
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StorySummary"
+    post:
+      operationId: createStory
+      security: [{sessionCookie: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StoryInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StoryDetail"
+        "400":
+          $ref: "#/components/responses/InvalidSession"
+  /stories/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+    get:
+      operationId: getStory
+      security: [{sessionCookie: []}]
+      responses:
+        "200":
+          description: Owned story with sessions that used it
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StoryDetail"
+        "404":
+          description: Story not found
+    put:
+      operationId: updateStory
+      security: [{sessionCookie: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StoryInput"
+      responses:
+        "200":
+          description: Updated story
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StoryDetail"
+        "400":
+          $ref: "#/components/responses/InvalidSession"
+        "404":
+          description: Story not found
+    delete:
+      operationId: deleteStory
+      security: [{sessionCookie: []}]
+      responses:
+        "204":
+          description: Story deleted; linked sessions kept with null story_id
+        "404":
+          description: Story not found
   /dashboard:
     get:
       operationId: getDashboard
@@ -226,6 +309,73 @@ components:
       in: cookie
       name: interviewprep.sid
   schemas:
+    StoryInput:
+      type: object
+      required: [title, competency_id]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 300
+        competency_id:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+          description: Must reference a behavioral question type.
+        context:
+          type: [string, "null"]
+          maxLength: 4000
+        situation:
+          type: [string, "null"]
+          maxLength: 4000
+        task:
+          type: [string, "null"]
+          maxLength: 4000
+        action:
+          type: [string, "null"]
+          maxLength: 4000
+        result:
+          type: [string, "null"]
+          maxLength: 4000
+    StorySummary:
+      allOf:
+        - $ref: "#/components/schemas/StoryInput"
+        - type: object
+          required: [id, competency_name, created_at, times_practiced, average_score]
+          properties:
+            id:
+              type: integer
+            competency_name:
+              type: string
+            created_at:
+              type: string
+            times_practiced:
+              type: integer
+            average_score:
+              type: [number, "null"]
+    StoryDetail:
+      allOf:
+        - $ref: "#/components/schemas/StorySummary"
+        - type: object
+          required: [sessions]
+          properties:
+            sessions:
+              type: array
+              items:
+                $ref: "#/components/schemas/StoryUsage"
+    StoryUsage:
+      type: object
+      required: [id, session_date, prompt, overall_score]
+      properties:
+        id:
+          type: integer
+        session_date:
+          type: string
+          format: date
+        prompt:
+          type: string
+        overall_score:
+          type: integer
     DashboardSummary:
       type: object
       required: [total_cases, average_case_score, weakest_case_type, behavioral_sessions, cases_by_type, section_averages, heatmap, next_case_focus]
@@ -407,6 +557,11 @@ components:
       type: object
       required: [session_date, question_type_id, prompt, format, overall_score]
       properties:
+        story_id:
+          type: [integer, "null"]
+          minimum: 1
+          maximum: 2147483647
+          description: Optional owned story for behavioral sessions. Omitted/null clears the link; a case session always clears it.
         section_scores:
           description: Scored sections only; omit N/A sections. Empty or omitted replaces all scores with none. Nonempty scores are rejected for behavioral sessions. Sections must exist and cannot repeat.
           type: array
@@ -447,8 +602,12 @@ components:
       allOf:
         - $ref: "#/components/schemas/SessionInput"
         - type: object
-          required: [id, question_type_name, kind, created_at, starred]
+          required: [id, question_type_name, kind, created_at, starred, story_id, story_title]
           properties:
+            story_id:
+              type: [integer, "null"]
+            story_title:
+              type: [string, "null"]
             starred:
               type: boolean
             id:

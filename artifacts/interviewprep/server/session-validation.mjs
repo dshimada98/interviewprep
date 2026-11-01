@@ -29,6 +29,7 @@ const input = z.object({
   duration_minutes: integer(1, 600, messages.duration).nullable().optional(),
   went_well: notes,
   to_improve: notes,
+  story_id: integer(1, 2147483647, 'Please choose one of your stories.').nullable().optional(),
   section_scores: z.array(z.object({
     section_id: integer(1, 2147483647, messages.section),
     score: integer(1, 5, messages.section),
@@ -41,7 +42,7 @@ const input = z.object({
 });
 
 // Both create and update call this before writing anything, within their transaction.
-export async function validateSession(body, database) {
+export async function validateSession(body, database, userId) {
   const result = input.safeParse(body);
   const errors = {};
   if (!result.success) {
@@ -67,11 +68,21 @@ export async function validateSession(body, database) {
       if (sections.rowCount !== scores.data.length) errors.section_scores = messages.section;
     }
   }
+  const story = input.shape.story_id.safeParse(body?.story_id);
+  if (story.success && story.data != null) {
+    // Hold a key-share lock until this session transaction commits, preventing
+    // a concurrent deletion from turning a validated link into a dangling FK.
+    const owned = await database.query(
+      'SELECT id FROM stories WHERE id=$1 AND user_id=$2 FOR KEY SHARE', [story.data, userId],
+    );
+    if (!owned.rowCount) errors.story_id = 'Please choose one of your stories.';
+  }
   if (!result.success || Object.keys(errors).length) return { errors };
   const data = result.data;
   return {
     values: [data.question_type_id, data.session_date, data.prompt, data.format,
-      data.overall_score, data.duration_minutes ?? null, data.went_well || null, data.to_improve || null],
+      data.overall_score, data.duration_minutes ?? null, data.went_well || null, data.to_improve || null,
+      kind === 'behavioral' ? data.story_id ?? null : null],
     scores: data.section_scores,
   };
 }

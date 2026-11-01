@@ -1,3 +1,3 @@
-- [Feature scope and ownership](feature-scope.md) — build InterviewPrep one feature at a time; custom auth, approved session-table exception, and user-managed Git.
+- [Feature scope and ownership](feature-scope.md) — incremental scope, custom auth, session-table exception, story competency semantics, and user-managed Git.
 - [Browser testing on Nix](browser-environment.md) — use system Chromium; downloaded browser bundles lack expected shared libraries in this environment.
 - [Delegated runtime changes](delegated-runtime-changes.md) — inspect runtime configuration after frontend delegation; helpers can introduce unneeded toolchains.

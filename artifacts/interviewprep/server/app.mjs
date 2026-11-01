@@ -10,6 +10,7 @@ import { getGroupedQuestionTypes } from './question-types.mjs';
 import { getCaseSections } from './case-sections.mjs';
 import { practiceSessions } from './practice-sessions.mjs';
 import { getDashboard } from './dashboard.mjs';
+import { stories } from './stories.mjs';
 
 const production = process.env.NODE_ENV === 'production';
 if (!process.env.SESSION_SECRET) throw new Error('SESSION_SECRET is required. Add it in Replit Secrets.');
@@ -24,6 +25,8 @@ app.disable('x-powered-by');
 app.set('trust proxy', 1);
 app.use(helmet({ contentSecurityPolicy: production ? undefined : false }));
 app.use('/api', (_req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
+// Four long STAR sections can exceed the smaller session/auth payload budget.
+app.use('/api/stories', express.json({ limit: '96kb' }));
 app.use('/api', express.json({ limit: '16kb' }));
 app.use('/api', session({
   name: cookieName,
@@ -132,6 +135,7 @@ export async function requireAuth(req, res, next) {
 }
 // Register every future API router BELOW this default-deny boundary.
 app.use('/api', requireAuth);
+app.use('/api/stories', stories);
 app.get('/api/dashboard', async (req, res) => {
   res.json(await getDashboard(req.user.id));
 });

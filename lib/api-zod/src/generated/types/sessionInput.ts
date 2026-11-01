@@ -10,6 +10,13 @@ import type { SessionInputFormat } from './sessionInputFormat';
 
 export interface SessionInput {
   /**
+     * Optional owned story for behavioral sessions. Omitted/null clears the link; a case session always clears it.
+     * @minimum 1
+     * @maximum 2147483647
+     * @nullable
+     */
+  story_id?: number | null;
+  /**
      * Scored sections only; omit N/A sections. Empty or omitted replaces all scores with none. Nonempty scores are rejected for behavioral sessions. Sections must exist and cannot repeat.
      * @maxItems 7
      */

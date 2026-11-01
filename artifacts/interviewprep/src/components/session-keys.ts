@@ -1,5 +1,8 @@
 import type { Query, QueryClient } from '@tanstack/react-query';
-import { getGetDashboardQueryKey, getGetSessionQueryKey, getListSessionsQueryKey, type ListSessionsParams, type SessionList } from '@workspace/api-client-react';
+import {
+  getGetDashboardQueryKey, getGetSessionQueryKey, getGetStoryQueryKey, getListSessionsQueryKey, getListStoriesQueryKey,
+  type ListSessionsParams, type SessionList,
+} from '@workspace/api-client-react';
 
 export const statusOf = (e: unknown) => (e && typeof e === 'object' && 'status' in e ? (e as { status: number }).status : undefined);
 
@@ -23,8 +26,10 @@ export const paramsOfKey = (k: readonly unknown[]): ListSessionsParams => (k.len
 
 export const dashboardKey = (uid?: number) => [...getGetDashboardQueryKey(), uid] as const;
 /** Session create/edit/delete changes list results and dashboard aggregates. Star toggles do not touch the dashboard. */
-export const invalidateLists = (qc: QueryClient, uid?: number, opts: { dashboard?: boolean } = {}) => Promise.all([
+export const invalidateLists = (qc: QueryClient, uid?: number, opts: { dashboard?: boolean; stories?: boolean } = {}) => Promise.all([
   qc.invalidateQueries({ predicate: isListQuery(uid) }),
+  // Story stats come from linked sessions; star toggles (dashboard: false) never change them.
+  (opts.stories ?? opts.dashboard !== false) ? qc.invalidateQueries({ predicate: isStoryQuery(uid) }) : undefined,
   opts.dashboard === false ? undefined : qc.invalidateQueries({ queryKey: dashboardKey(uid), exact: true }),
 ]);
 
@@ -36,3 +41,24 @@ export function removeFromLists(qc: QueryClient, uid: number | undefined, id: nu
     qc.setQueryData<SessionList>(key, { sessions: old.sessions.filter(s => s.id !== id), total: Math.max(0, old.total - 1) });
   }
 }
+
+/* ---------------- Stories ---------------- */
+const STORY_ROOT = getListStoriesQueryKey()[0];
+export const storyListKey = (uid?: number, competency?: number) =>
+  [...getListStoriesQueryKey(competency ? { competency } : undefined), uid] as const;
+export const storyDetailKey = (id: number, uid?: number) => [...getGetStoryQueryKey(id), uid] as const;
+/** Every story list variant and story detail for one user. */
+export const isStoryQuery = (uid?: number) => (q: Query) => {
+  const k0 = q.queryKey[0];
+  return typeof k0 === 'string' && (k0 === STORY_ROOT || k0.startsWith(`${STORY_ROOT}/`)) && q.queryKey.at(-1) === uid;
+};
+const isSessionDetail = (uid?: number) => (q: Query) => {
+  const k0 = q.queryKey[0];
+  return typeof k0 === 'string' && /^\/api\/sessions\/\d+$/.test(k0) && q.queryKey.at(-1) === uid;
+};
+/** Story create/edit/delete: refresh story lists/details plus session lists/details that show story titles. */
+export const invalidateStories = (qc: QueryClient, uid?: number) => Promise.all([
+  qc.invalidateQueries({ predicate: isStoryQuery(uid) }),
+  qc.invalidateQueries({ predicate: isListQuery(uid) }),
+  qc.invalidateQueries({ predicate: isSessionDetail(uid) }),
+]);

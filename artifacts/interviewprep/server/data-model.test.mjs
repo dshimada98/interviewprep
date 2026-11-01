@@ -76,9 +76,10 @@ test('Feature 2 reference data, database constraints, and protected API', async 
         await rejects('INSERT INTO question_types (name, kind) VALUES ($1,$2)', [null, 'case'], '23502');
         await rejects('INSERT INTO question_types (name, kind) VALUES ($1,$2)', ['Missing kind', null], '23502');
         const columns = (await client.query(
-          "SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='practice_sessions'",
+          "SELECT column_name, data_type, is_nullable FROM information_schema.columns WHERE table_schema='public' AND table_name='practice_sessions'",
         )).rows;
-        assert.ok(!columns.some(row => row.column_name === 'story_id'));
+        assert.ok(columns.some(row => row.column_name === 'story_id'
+          && row.data_type === 'integer' && row.is_nullable === 'YES'));
         await client.query('DELETE FROM users WHERE id=$1', [user.id]);
         assert.equal((await client.query('SELECT id FROM practice_sessions WHERE id=$1', [saved.id])).rowCount, 0);
       } finally { await client.query('ROLLBACK'); }

@@ -8,10 +8,14 @@
 import type { PracticeSessionKind } from './practiceSessionKind';
 import type { SessionInput } from './sessionInput';
 
-export type PracticeSession = SessionInput & {
+export type PracticeSession = SessionInput & ({
+  /** @nullable */
+  story_id: number | null;
+  /** @nullable */
+  story_title: string | null;
   starred: boolean;
   id: number;
   question_type_name: string;
   kind: PracticeSessionKind;
   created_at: string;
-};
+});

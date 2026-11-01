@@ -17,6 +17,21 @@ CREATE TABLE IF NOT EXISTS question_types (
   kind TEXT NOT NULL CHECK (kind IN ('case', 'behavioral'))
 );
 
+CREATE TABLE IF NOT EXISTS stories (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  competency_id INTEGER NOT NULL REFERENCES question_types(id),
+  title TEXT NOT NULL CHECK (length(btrim(title)) > 0),
+  context TEXT,
+  situation TEXT,
+  task TEXT,
+  action TEXT,
+  result TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS stories_user_id_idx ON stories (user_id);
+CREATE INDEX IF NOT EXISTS stories_competency_id_idx ON stories (competency_id);
+
 CREATE TABLE IF NOT EXISTS practice_sessions (
   id SERIAL PRIMARY KEY,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -32,6 +47,9 @@ CREATE TABLE IF NOT EXISTS practice_sessions (
 );
 CREATE INDEX IF NOT EXISTS practice_sessions_user_id_idx ON practice_sessions (user_id);
 CREATE INDEX IF NOT EXISTS practice_sessions_question_type_id_idx ON practice_sessions (question_type_id);
+ALTER TABLE practice_sessions
+  ADD COLUMN IF NOT EXISTS story_id INTEGER REFERENCES stories(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS practice_sessions_story_id_idx ON practice_sessions (story_id);
 
 CREATE TABLE IF NOT EXISTS case_sections (
   id SERIAL PRIMARY KEY,
