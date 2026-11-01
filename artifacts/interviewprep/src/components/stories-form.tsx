@@ -8,6 +8,7 @@ import {
 } from '@workspace/api-client-react';
 import { sessionRequestOptions, useAuth } from '@/auth';
 import { BackLink, ErrText, ErrorPanel, Shell, use401 } from './sessions';
+import { CategorySelect } from './category-select';
 import { invalidateStories, statusOf, storyDetailKey } from './session-keys';
 
 const MAX_INT = 2147483647;
@@ -112,6 +113,7 @@ function StoryForm({ initial, submitLabel, busy, cancelHref, serverErrors, onSub
 }) {
   const [v, setV] = useState<Vals>(initial);
   const [errs, setErrs] = useState<Errs>({});
+  const [adding, setAdding] = useState(false);
   const types = useBehavioralTypes();
   const formRef = useRef<HTMLFormElement>(null);
   const focus = useRef(false);
@@ -136,6 +138,7 @@ function StoryForm({ initial, submitLabel, busy, cancelHref, serverErrors, onSub
   function submit(e: FormEvent) {
     e.preventDefault();
     if (busy) return;
+    if (adding) { focus.current = true; setErrs({ form: 'Save or cancel your new category before saving the story.' }); return; }
     if (!types.data) { focus.current = true; setErrs({ form: 'Please load the competencies before saving.' }); return; }
     const [er, input] = validate(v, ids);
     if (!input) { focus.current = true; setErrs(er); return; }
@@ -173,11 +176,11 @@ function StoryForm({ initial, submitLabel, busy, cancelHref, serverErrors, onSub
                   <button type="button" data-testid="button-retry-competencies" onClick={() => void types.refetch()} disabled={types.isFetching} className="ip-focus min-h-11 px-4 rounded-lg border bg-white font-semibold">{types.isFetching ? 'Retrying...' : 'Retry'}</button>
                 </div>
               ) : (
-                <select {...a11y('competency_id', errs.competency_id)} data-testid="select-story-competency" className={inputCls}
-                  value={v.competency_id} onChange={e => set('competency_id')(e.target.value)}>
-                  <option value="">Choose a competency</option>
-                  {(types.data?.behavioral ?? []).map(t => <option key={t.id} value={String(t.id)}>{t.name}</option>)}
-                </select>
+                <CategorySelect id="competency_id" testid="select-story-competency" className={inputCls}
+                  invalid={!!errs.competency_id} describedBy={errs.competency_id ? 'competency_id-err' : undefined}
+                  style={{ borderColor: errs.competency_id ? '#C0392B' : undefined }}
+                  value={v.competency_id} onChange={set('competency_id')} placeholder="Choose a competency"
+                  options={types.data?.behavioral ?? []} allowAdd disabled={busy} onAddingChange={setAdding} />
               )}
             <Err id="competency_id" msg={errs.competency_id} />
           </div>
@@ -206,7 +209,7 @@ function StoryForm({ initial, submitLabel, busy, cancelHref, serverErrors, onSub
 
       <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 border-t pt-6">
         <Link href={cancelHref} data-testid="link-cancel-story" className="ip-focus min-h-11 px-5 rounded-lg inline-flex items-center justify-center font-semibold border bg-white">Cancel</Link>
-        <button type="submit" disabled={busy} data-testid="button-save-story"
+        <button type="submit" disabled={busy || adding} data-testid="button-save-story"
           className="ip-focus min-h-11 px-6 rounded-lg font-semibold text-white inline-flex items-center justify-center gap-2 disabled:opacity-70 active:scale-[0.99] transition-transform"
           style={{ background: 'var(--navy)', borderBottom: '3px solid var(--green)' }}>
           {busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}{busy ? 'Saving...' : submitLabel}

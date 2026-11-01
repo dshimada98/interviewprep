@@ -55,7 +55,7 @@ export async function validateSession(body, database, userId) {
   const typeId = input.shape.question_type_id.safeParse(body?.question_type_id);
   let kind;
   if (typeId.success) {
-    const type = await database.query('SELECT kind FROM question_types WHERE id=$1', [typeId.data]);
+    const type = await database.query('SELECT kind FROM question_types WHERE id=$1 AND (user_id IS NULL OR user_id=$2)', [typeId.data, userId]);
     kind = type.rows[0]?.kind;
     if (!kind) errors.question_type_id = messages.type;
   }

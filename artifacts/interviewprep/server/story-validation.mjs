@@ -12,7 +12,7 @@ const input = z.object({
   context: text, situation: text, task: text, action: text, result: text,
 });
 
-export async function validateStory(body, database) {
+export async function validateStory(body, database, userId) {
   const parsed = input.safeParse(body);
   const errors = {};
   if (!parsed.success) {
@@ -24,7 +24,7 @@ export async function validateStory(body, database) {
   const competency = input.shape.competency_id.safeParse(body?.competency_id);
   if (competency.success) {
     const found = await database.query(
-      "SELECT id FROM question_types WHERE id=$1 AND kind='behavioral'", [competency.data],
+      "SELECT id FROM question_types WHERE id=$1 AND kind='behavioral' AND (user_id IS NULL OR user_id=$2)", [competency.data, userId],
     );
     if (!found.rowCount) errors.competency_id = COMPETENCY;
   }

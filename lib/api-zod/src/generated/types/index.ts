@@ -28,6 +28,7 @@ export * from './practiceSession';
 export * from './practiceSessionDetail';
 export * from './practiceSessionKind';
 export * from './questionType';
+export * from './questionTypeInput';
 export * from './questionTypeKind';
 export * from './sectionScore';
 export * from './sectionScoreInput';

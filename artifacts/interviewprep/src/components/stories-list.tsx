@@ -7,6 +7,7 @@ import { sessionRequestOptions, useAuth } from '@/auth';
 import { ErrorPanel, Shell, use401 } from './sessions';
 import { storyListKey } from './session-keys';
 import { useBehavioralTypes } from './stories-form';
+import { CustomTag, isCustom } from './category-select';
 
 export function practicedLine(times: number, avg: number | null) {
   if (!times) return 'Not practiced yet';
@@ -59,13 +60,13 @@ export function StoriesListPage() {
   for (const s of all.data ?? []) counts.set(s.competency_id, (counts.get(s.competency_id) ?? 0) + 1);
   const none = all.data && all.data.length === 0;
 
-  const chip = (id: number | null, label: string, n: number | undefined) => {
+  const chip = (id: number | null, label: string, n: number | undefined, custom = false) => {
     const on = filter === id;
     return (
       <button key={id ?? 'all'} type="button" aria-pressed={on} data-testid={`chip-competency-${id ?? 'all'}`} onClick={() => setFilter(id)}
         className="ip-focus min-h-11 shrink-0 rounded-full border px-4 text-sm font-semibold whitespace-nowrap transition-colors hover:border-[color:var(--navy)]"
         style={on ? { background: 'var(--navy)', color: 'white', borderColor: 'var(--navy)' } : { background: 'white' }}>
-        {label} <span className="tabular-nums" style={{ opacity: on ? 0.8 : 0.6 }}>({n ?? 0})</span>
+        {label}{custom && <CustomTag on={on} />} <span className="tabular-nums" style={{ opacity: on ? 0.8 : 0.6 }}>({n ?? 0})</span>
       </button>
     );
   };
@@ -87,7 +88,7 @@ export function StoriesListPage() {
       {all.data && (
         <div role="group" aria-label="Filter by competency" className="mt-8 flex flex-wrap gap-2" data-testid="group-competency-chips">
           {chip(null, 'All', all.data.length)}
-          {(types.data?.behavioral ?? []).map(t => chip(t.id, t.name, counts.get(t.id)))}
+          {(types.data?.behavioral ?? []).map(t => chip(t.id, t.name, counts.get(t.id), isCustom(t)))}
         </div>
       )}
 

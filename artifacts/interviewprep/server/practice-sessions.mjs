@@ -3,6 +3,7 @@ import { pool } from './db.mjs';
 import { replaceSectionScores } from './case-sections.mjs';
 import { validateSession } from './session-validation.mjs';
 import { sessionListQuery } from './session-finder.mjs';
+import { visibleQuestionType } from './question-types.mjs';
 const fields = `s.id, s.question_type_id, s.session_date::text, s.prompt, s.format,
   s.overall_score, s.duration_minutes, s.went_well, s.to_improve, s.created_at,
   q.name AS question_type_name, q.kind, s.story_id,
@@ -54,6 +55,14 @@ async function readSession(database, sessionId, userId) {
 
 export const practiceSessions = Router();
 practiceSessions.get('/', async (req, res) => {
+  const type = req.query.type;
+  if (typeof type === 'string' && /^[1-9]\d*$/.test(type) && Number(type) <= 2147483647) {
+    const visible = await visibleQuestionType(pool, Number(type), req.user.id);
+    if (!visible) {
+      const exists = await pool.query('SELECT id FROM question_types WHERE id=$1', [Number(type)]);
+      if (exists.rowCount) return res.status(400).json({ errors: { type: 'Please choose a question type.' } });
+    }
+  }
   const result = await pool.query(sessionListQuery(req.user.id, req.query, fields));
   res.json(result.rows[0]);
 });

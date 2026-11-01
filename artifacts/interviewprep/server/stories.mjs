@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { pool } from './db.mjs';
 import { sessionTransaction } from './practice-sessions.mjs';
 import { validateStory } from './story-validation.mjs';
+import { visibleQuestionType } from './question-types.mjs';
 
 const notFound = res => res.status(404).json({ message: 'Story not found' });
 const fields = `st.id, st.competency_id, st.title, st.context, st.situation, st.task,
@@ -29,13 +30,22 @@ stories.get('/', async (req, res) => {
   const raw = req.query.competency;
   const competency = typeof raw === 'string' && /^[1-9]\d*$/.test(raw)
     && Number(raw) <= 2147483647 ? Number(raw) : null;
+  if (competency) {
+    const type = await visibleQuestionType(pool, competency, req.user.id);
+    if (!type) {
+      const exists = await pool.query('SELECT id FROM question_types WHERE id=$1', [competency]);
+      if (exists.rowCount) return res.status(400).json({ errors: { competency: 'Please choose a competency.' } });
+    } else if (type.kind !== 'behavioral') {
+      return res.status(400).json({ errors: { competency: 'Please choose a competency.' } });
+    }
+  }
   res.json((await pool.query(`SELECT ${fields} FROM ${source}
     WHERE st.user_id=$1 AND ($2::integer IS NULL OR st.competency_id=$2)
     ORDER BY st.created_at DESC, st.id DESC`, [req.user.id, competency])).rows);
 });
 stories.post('/', async (req, res) => {
   const saved = await sessionTransaction(async database => {
-    const input = await validateStory(req.body, database);
+    const input = await validateStory(req.body, database, req.user.id);
     if (input.errors) { res.status(400).json({ errors: input.errors }); return null; }
     const result = await database.query(`INSERT INTO stories
       (user_id, competency_id, title, context, situation, task, action, result)
@@ -58,7 +68,7 @@ stories.put('/:id', async (req, res) => {
     const owned = await database.query('SELECT id FROM stories WHERE id=$1 AND user_id=$2 FOR UPDATE',
       [req.params.id, req.user.id]);
     if (!owned.rowCount) { notFound(res); return null; }
-    const input = await validateStory(req.body, database);
+    const input = await validateStory(req.body, database, req.user.id);
     if (input.errors) { res.status(400).json({ errors: input.errors }); return null; }
     await database.query(`UPDATE stories SET competency_id=$3, title=$4, context=$5,
       situation=$6, task=$7, action=$8, result=$9 WHERE id=$1 AND user_id=$2`,

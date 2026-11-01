@@ -101,7 +101,7 @@ test('Feature 2 reference data, database constraints, and protected API', async 
         for (const kind of ['case', 'behavioral']) {
           assert.deepEqual(body[kind].map(row => row.name).sort(),
             questionTypeSeeds.filter(([, k]) => k === kind).map(([name]) => name).sort());
-          assert.ok(body[kind].every(row => row.kind === kind && Number.isInteger(row.id) && !('user_id' in row)));
+          assert.ok(body[kind].every(row => row.kind === kind && Number.isInteger(row.id) && row.user_id === null));
         }
         if (first) assert.deepEqual(body, first);
         first = body;
