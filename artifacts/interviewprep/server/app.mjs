@@ -7,6 +7,7 @@ import { rateLimit } from 'express-rate-limit';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { pool } from './db.mjs';
 import { getGroupedQuestionTypes } from './question-types.mjs';
+import { getCaseSections } from './case-sections.mjs';
 import { practiceSessions } from './practice-sessions.mjs';
 
 const production = process.env.NODE_ENV === 'production';
@@ -130,6 +131,9 @@ export async function requireAuth(req, res, next) {
 }
 // Register every future API router BELOW this default-deny boundary.
 app.use('/api', requireAuth);
+app.get('/api/case-sections', async (_req, res) => {
+  res.json(await getCaseSections());
+});
 app.use('/api/sessions', practiceSessions);
 app.get('/api/question-types', async (_req, res) => {
   res.json(await getGroupedQuestionTypes());

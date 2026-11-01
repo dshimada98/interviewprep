@@ -8,6 +8,27 @@
 import * as zod from 'zod';
 
 
+/**
+ * @summary List shared case sections in scorecard order
+ */
+export const GetCaseSectionsResponseItem = zod.object({
+  "id": zod.number().int(),
+  "name": zod.string(),
+  "display_order": zod.number().int()
+})
+export const GetCaseSectionsResponse = zod.array(GetCaseSectionsResponseItem)
+
+
+export const listSessionsResponseOneSectionScoresItemSectionIdMax = 2147483647;
+
+export const listSessionsResponseOneSectionScoresItemScoreMax = 5;
+
+export const listSessionsResponseOneSectionScoresItemWentWellMax = 4000;
+
+export const listSessionsResponseOneSectionScoresItemToImproveMax = 4000;
+
+export const listSessionsResponseOneSectionScoresMax = 7;
+
 export const listSessionsResponseOneSessionDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
 export const listSessionsResponseOneQuestionTypeIdMax = 2147483647;
 
@@ -25,6 +46,12 @@ export const listSessionsResponseOneToImproveMax = 4000;
 
 
 export const ListSessionsResponseItem = zod.object({
+  "section_scores": zod.array(zod.object({
+  "section_id": zod.number().int().min(1).max(listSessionsResponseOneSectionScoresItemSectionIdMax),
+  "score": zod.number().int().min(1).max(listSessionsResponseOneSectionScoresItemScoreMax),
+  "went_well": zod.string().max(listSessionsResponseOneSectionScoresItemWentWellMax).nullish(),
+  "to_improve": zod.string().max(listSessionsResponseOneSectionScoresItemToImproveMax).nullish()
+})).max(listSessionsResponseOneSectionScoresMax).optional().describe('Scored sections only; omit N/A sections. Empty or omitted replaces all scores with none. Ignored for behavioral sessions.'),
   "session_date": zod.string().regex(listSessionsResponseOneSessionDateRegExp),
   "question_type_id": zod.number().int().min(1).max(listSessionsResponseOneQuestionTypeIdMax),
   "prompt": zod.string().min(1).max(listSessionsResponseOnePromptMax),
@@ -41,6 +68,16 @@ export const ListSessionsResponseItem = zod.object({
 }))
 export const ListSessionsResponse = zod.array(ListSessionsResponseItem)
 
+
+export const createSessionBodySectionScoresItemSectionIdMax = 2147483647;
+
+export const createSessionBodySectionScoresItemScoreMax = 5;
+
+export const createSessionBodySectionScoresItemWentWellMax = 4000;
+
+export const createSessionBodySectionScoresItemToImproveMax = 4000;
+
+export const createSessionBodySectionScoresMax = 7;
 
 export const createSessionBodySessionDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
 export const createSessionBodyQuestionTypeIdMax = 2147483647;
@@ -59,6 +96,12 @@ export const createSessionBodyToImproveMax = 4000;
 
 
 export const CreateSessionBody = zod.object({
+  "section_scores": zod.array(zod.object({
+  "section_id": zod.number().int().min(1).max(createSessionBodySectionScoresItemSectionIdMax),
+  "score": zod.number().int().min(1).max(createSessionBodySectionScoresItemScoreMax),
+  "went_well": zod.string().max(createSessionBodySectionScoresItemWentWellMax).nullish(),
+  "to_improve": zod.string().max(createSessionBodySectionScoresItemToImproveMax).nullish()
+})).max(createSessionBodySectionScoresMax).optional().describe('Scored sections only; omit N/A sections. Empty or omitted replaces all scores with none. Ignored for behavioral sessions.'),
   "session_date": zod.string().regex(createSessionBodySessionDateRegExp),
   "question_type_id": zod.number().int().min(1).max(createSessionBodyQuestionTypeIdMax),
   "prompt": zod.string().min(1).max(createSessionBodyPromptMax),
@@ -69,36 +112,71 @@ export const CreateSessionBody = zod.object({
   "to_improve": zod.string().max(createSessionBodyToImproveMax).nullish()
 })
 
-export const createSessionResponseOneSessionDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
-export const createSessionResponseOneQuestionTypeIdMax = 2147483647;
+export const createSessionResponseOneOneSectionScoresItemSectionIdMax = 2147483647;
 
-export const createSessionResponseOnePromptMax = 4000;
+export const createSessionResponseOneOneSectionScoresItemScoreMax = 5;
 
-export const createSessionResponseOneOverallScoreMax = 5;
+export const createSessionResponseOneOneSectionScoresItemWentWellMax = 4000;
 
-export const createSessionResponseOneDurationMinutesMin = 0;
-export const createSessionResponseOneDurationMinutesMax = 2147483647;
+export const createSessionResponseOneOneSectionScoresItemToImproveMax = 4000;
 
-export const createSessionResponseOneWentWellMax = 4000;
+export const createSessionResponseOneOneSectionScoresMax = 7;
 
-export const createSessionResponseOneToImproveMax = 4000;
+export const createSessionResponseOneOneSessionDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const createSessionResponseOneOneQuestionTypeIdMax = 2147483647;
+
+export const createSessionResponseOneOnePromptMax = 4000;
+
+export const createSessionResponseOneOneOverallScoreMax = 5;
+
+export const createSessionResponseOneOneDurationMinutesMin = 0;
+export const createSessionResponseOneOneDurationMinutesMax = 2147483647;
+
+export const createSessionResponseOneOneWentWellMax = 4000;
+
+export const createSessionResponseOneOneToImproveMax = 4000;
+
+export const createSessionResponseTwoSectionScoresItemOneSectionIdMax = 2147483647;
+
+export const createSessionResponseTwoSectionScoresItemOneScoreMax = 5;
+
+export const createSessionResponseTwoSectionScoresItemOneWentWellMax = 4000;
+
+export const createSessionResponseTwoSectionScoresItemOneToImproveMax = 4000;
 
 
 
 export const CreateSessionResponse = zod.object({
-  "session_date": zod.string().regex(createSessionResponseOneSessionDateRegExp),
-  "question_type_id": zod.number().int().min(1).max(createSessionResponseOneQuestionTypeIdMax),
-  "prompt": zod.string().min(1).max(createSessionResponseOnePromptMax),
+  "section_scores": zod.array(zod.object({
+  "section_id": zod.number().int().min(1).max(createSessionResponseOneOneSectionScoresItemSectionIdMax),
+  "score": zod.number().int().min(1).max(createSessionResponseOneOneSectionScoresItemScoreMax),
+  "went_well": zod.string().max(createSessionResponseOneOneSectionScoresItemWentWellMax).nullish(),
+  "to_improve": zod.string().max(createSessionResponseOneOneSectionScoresItemToImproveMax).nullish()
+})).max(createSessionResponseOneOneSectionScoresMax).optional().describe('Scored sections only; omit N/A sections. Empty or omitted replaces all scores with none. Ignored for behavioral sessions.'),
+  "session_date": zod.string().regex(createSessionResponseOneOneSessionDateRegExp),
+  "question_type_id": zod.number().int().min(1).max(createSessionResponseOneOneQuestionTypeIdMax),
+  "prompt": zod.string().min(1).max(createSessionResponseOneOnePromptMax),
   "format": zod.enum(['solo', 'partner', 'mock']),
-  "overall_score": zod.number().int().min(1).max(createSessionResponseOneOverallScoreMax),
-  "duration_minutes": zod.number().int().min(createSessionResponseOneDurationMinutesMin).max(createSessionResponseOneDurationMinutesMax).nullish(),
-  "went_well": zod.string().max(createSessionResponseOneWentWellMax).nullish(),
-  "to_improve": zod.string().max(createSessionResponseOneToImproveMax).nullish()
+  "overall_score": zod.number().int().min(1).max(createSessionResponseOneOneOverallScoreMax),
+  "duration_minutes": zod.number().int().min(createSessionResponseOneOneDurationMinutesMin).max(createSessionResponseOneOneDurationMinutesMax).nullish(),
+  "went_well": zod.string().max(createSessionResponseOneOneWentWellMax).nullish(),
+  "to_improve": zod.string().max(createSessionResponseOneOneToImproveMax).nullish()
 }).and(zod.object({
   "id": zod.number().int(),
   "question_type_name": zod.string(),
   "kind": zod.enum(['case', 'behavioral']),
   "created_at": zod.string()
+})).and(zod.object({
+  "section_scores": zod.array(zod.object({
+  "section_id": zod.number().int().min(1).max(createSessionResponseTwoSectionScoresItemOneSectionIdMax),
+  "score": zod.number().int().min(1).max(createSessionResponseTwoSectionScoresItemOneScoreMax),
+  "went_well": zod.string().max(createSessionResponseTwoSectionScoresItemOneWentWellMax).nullish(),
+  "to_improve": zod.string().max(createSessionResponseTwoSectionScoresItemOneToImproveMax).nullish()
+}).and(zod.object({
+  "id": zod.number().int(),
+  "section_name": zod.string(),
+  "display_order": zod.number().int()
+})))
 }))
 
 
@@ -106,42 +184,87 @@ export const GetSessionParams = zod.object({
   "id": zod.coerce.number().int()
 })
 
-export const getSessionResponseOneSessionDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
-export const getSessionResponseOneQuestionTypeIdMax = 2147483647;
+export const getSessionResponseOneOneSectionScoresItemSectionIdMax = 2147483647;
 
-export const getSessionResponseOnePromptMax = 4000;
+export const getSessionResponseOneOneSectionScoresItemScoreMax = 5;
 
-export const getSessionResponseOneOverallScoreMax = 5;
+export const getSessionResponseOneOneSectionScoresItemWentWellMax = 4000;
 
-export const getSessionResponseOneDurationMinutesMin = 0;
-export const getSessionResponseOneDurationMinutesMax = 2147483647;
+export const getSessionResponseOneOneSectionScoresItemToImproveMax = 4000;
 
-export const getSessionResponseOneWentWellMax = 4000;
+export const getSessionResponseOneOneSectionScoresMax = 7;
 
-export const getSessionResponseOneToImproveMax = 4000;
+export const getSessionResponseOneOneSessionDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const getSessionResponseOneOneQuestionTypeIdMax = 2147483647;
+
+export const getSessionResponseOneOnePromptMax = 4000;
+
+export const getSessionResponseOneOneOverallScoreMax = 5;
+
+export const getSessionResponseOneOneDurationMinutesMin = 0;
+export const getSessionResponseOneOneDurationMinutesMax = 2147483647;
+
+export const getSessionResponseOneOneWentWellMax = 4000;
+
+export const getSessionResponseOneOneToImproveMax = 4000;
+
+export const getSessionResponseTwoSectionScoresItemOneSectionIdMax = 2147483647;
+
+export const getSessionResponseTwoSectionScoresItemOneScoreMax = 5;
+
+export const getSessionResponseTwoSectionScoresItemOneWentWellMax = 4000;
+
+export const getSessionResponseTwoSectionScoresItemOneToImproveMax = 4000;
 
 
 
 export const GetSessionResponse = zod.object({
-  "session_date": zod.string().regex(getSessionResponseOneSessionDateRegExp),
-  "question_type_id": zod.number().int().min(1).max(getSessionResponseOneQuestionTypeIdMax),
-  "prompt": zod.string().min(1).max(getSessionResponseOnePromptMax),
+  "section_scores": zod.array(zod.object({
+  "section_id": zod.number().int().min(1).max(getSessionResponseOneOneSectionScoresItemSectionIdMax),
+  "score": zod.number().int().min(1).max(getSessionResponseOneOneSectionScoresItemScoreMax),
+  "went_well": zod.string().max(getSessionResponseOneOneSectionScoresItemWentWellMax).nullish(),
+  "to_improve": zod.string().max(getSessionResponseOneOneSectionScoresItemToImproveMax).nullish()
+})).max(getSessionResponseOneOneSectionScoresMax).optional().describe('Scored sections only; omit N/A sections. Empty or omitted replaces all scores with none. Ignored for behavioral sessions.'),
+  "session_date": zod.string().regex(getSessionResponseOneOneSessionDateRegExp),
+  "question_type_id": zod.number().int().min(1).max(getSessionResponseOneOneQuestionTypeIdMax),
+  "prompt": zod.string().min(1).max(getSessionResponseOneOnePromptMax),
   "format": zod.enum(['solo', 'partner', 'mock']),
-  "overall_score": zod.number().int().min(1).max(getSessionResponseOneOverallScoreMax),
-  "duration_minutes": zod.number().int().min(getSessionResponseOneDurationMinutesMin).max(getSessionResponseOneDurationMinutesMax).nullish(),
-  "went_well": zod.string().max(getSessionResponseOneWentWellMax).nullish(),
-  "to_improve": zod.string().max(getSessionResponseOneToImproveMax).nullish()
+  "overall_score": zod.number().int().min(1).max(getSessionResponseOneOneOverallScoreMax),
+  "duration_minutes": zod.number().int().min(getSessionResponseOneOneDurationMinutesMin).max(getSessionResponseOneOneDurationMinutesMax).nullish(),
+  "went_well": zod.string().max(getSessionResponseOneOneWentWellMax).nullish(),
+  "to_improve": zod.string().max(getSessionResponseOneOneToImproveMax).nullish()
 }).and(zod.object({
   "id": zod.number().int(),
   "question_type_name": zod.string(),
   "kind": zod.enum(['case', 'behavioral']),
   "created_at": zod.string()
+})).and(zod.object({
+  "section_scores": zod.array(zod.object({
+  "section_id": zod.number().int().min(1).max(getSessionResponseTwoSectionScoresItemOneSectionIdMax),
+  "score": zod.number().int().min(1).max(getSessionResponseTwoSectionScoresItemOneScoreMax),
+  "went_well": zod.string().max(getSessionResponseTwoSectionScoresItemOneWentWellMax).nullish(),
+  "to_improve": zod.string().max(getSessionResponseTwoSectionScoresItemOneToImproveMax).nullish()
+}).and(zod.object({
+  "id": zod.number().int(),
+  "section_name": zod.string(),
+  "display_order": zod.number().int()
+})))
 }))
 
 
 export const UpdateSessionParams = zod.object({
   "id": zod.coerce.number().int()
 })
+
+export const updateSessionBodySectionScoresItemSectionIdMax = 2147483647;
+
+export const updateSessionBodySectionScoresItemScoreMax = 5;
+
+export const updateSessionBodySectionScoresItemWentWellMax = 4000;
+
+export const updateSessionBodySectionScoresItemToImproveMax = 4000;
+
+export const updateSessionBodySectionScoresMax = 7;
 
 export const updateSessionBodySessionDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
 export const updateSessionBodyQuestionTypeIdMax = 2147483647;
@@ -160,6 +283,12 @@ export const updateSessionBodyToImproveMax = 4000;
 
 
 export const UpdateSessionBody = zod.object({
+  "section_scores": zod.array(zod.object({
+  "section_id": zod.number().int().min(1).max(updateSessionBodySectionScoresItemSectionIdMax),
+  "score": zod.number().int().min(1).max(updateSessionBodySectionScoresItemScoreMax),
+  "went_well": zod.string().max(updateSessionBodySectionScoresItemWentWellMax).nullish(),
+  "to_improve": zod.string().max(updateSessionBodySectionScoresItemToImproveMax).nullish()
+})).max(updateSessionBodySectionScoresMax).optional().describe('Scored sections only; omit N/A sections. Empty or omitted replaces all scores with none. Ignored for behavioral sessions.'),
   "session_date": zod.string().regex(updateSessionBodySessionDateRegExp),
   "question_type_id": zod.number().int().min(1).max(updateSessionBodyQuestionTypeIdMax),
   "prompt": zod.string().min(1).max(updateSessionBodyPromptMax),
@@ -170,36 +299,71 @@ export const UpdateSessionBody = zod.object({
   "to_improve": zod.string().max(updateSessionBodyToImproveMax).nullish()
 })
 
-export const updateSessionResponseOneSessionDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
-export const updateSessionResponseOneQuestionTypeIdMax = 2147483647;
+export const updateSessionResponseOneOneSectionScoresItemSectionIdMax = 2147483647;
 
-export const updateSessionResponseOnePromptMax = 4000;
+export const updateSessionResponseOneOneSectionScoresItemScoreMax = 5;
 
-export const updateSessionResponseOneOverallScoreMax = 5;
+export const updateSessionResponseOneOneSectionScoresItemWentWellMax = 4000;
 
-export const updateSessionResponseOneDurationMinutesMin = 0;
-export const updateSessionResponseOneDurationMinutesMax = 2147483647;
+export const updateSessionResponseOneOneSectionScoresItemToImproveMax = 4000;
 
-export const updateSessionResponseOneWentWellMax = 4000;
+export const updateSessionResponseOneOneSectionScoresMax = 7;
 
-export const updateSessionResponseOneToImproveMax = 4000;
+export const updateSessionResponseOneOneSessionDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const updateSessionResponseOneOneQuestionTypeIdMax = 2147483647;
+
+export const updateSessionResponseOneOnePromptMax = 4000;
+
+export const updateSessionResponseOneOneOverallScoreMax = 5;
+
+export const updateSessionResponseOneOneDurationMinutesMin = 0;
+export const updateSessionResponseOneOneDurationMinutesMax = 2147483647;
+
+export const updateSessionResponseOneOneWentWellMax = 4000;
+
+export const updateSessionResponseOneOneToImproveMax = 4000;
+
+export const updateSessionResponseTwoSectionScoresItemOneSectionIdMax = 2147483647;
+
+export const updateSessionResponseTwoSectionScoresItemOneScoreMax = 5;
+
+export const updateSessionResponseTwoSectionScoresItemOneWentWellMax = 4000;
+
+export const updateSessionResponseTwoSectionScoresItemOneToImproveMax = 4000;
 
 
 
 export const UpdateSessionResponse = zod.object({
-  "session_date": zod.string().regex(updateSessionResponseOneSessionDateRegExp),
-  "question_type_id": zod.number().int().min(1).max(updateSessionResponseOneQuestionTypeIdMax),
-  "prompt": zod.string().min(1).max(updateSessionResponseOnePromptMax),
+  "section_scores": zod.array(zod.object({
+  "section_id": zod.number().int().min(1).max(updateSessionResponseOneOneSectionScoresItemSectionIdMax),
+  "score": zod.number().int().min(1).max(updateSessionResponseOneOneSectionScoresItemScoreMax),
+  "went_well": zod.string().max(updateSessionResponseOneOneSectionScoresItemWentWellMax).nullish(),
+  "to_improve": zod.string().max(updateSessionResponseOneOneSectionScoresItemToImproveMax).nullish()
+})).max(updateSessionResponseOneOneSectionScoresMax).optional().describe('Scored sections only; omit N/A sections. Empty or omitted replaces all scores with none. Ignored for behavioral sessions.'),
+  "session_date": zod.string().regex(updateSessionResponseOneOneSessionDateRegExp),
+  "question_type_id": zod.number().int().min(1).max(updateSessionResponseOneOneQuestionTypeIdMax),
+  "prompt": zod.string().min(1).max(updateSessionResponseOneOnePromptMax),
   "format": zod.enum(['solo', 'partner', 'mock']),
-  "overall_score": zod.number().int().min(1).max(updateSessionResponseOneOverallScoreMax),
-  "duration_minutes": zod.number().int().min(updateSessionResponseOneDurationMinutesMin).max(updateSessionResponseOneDurationMinutesMax).nullish(),
-  "went_well": zod.string().max(updateSessionResponseOneWentWellMax).nullish(),
-  "to_improve": zod.string().max(updateSessionResponseOneToImproveMax).nullish()
+  "overall_score": zod.number().int().min(1).max(updateSessionResponseOneOneOverallScoreMax),
+  "duration_minutes": zod.number().int().min(updateSessionResponseOneOneDurationMinutesMin).max(updateSessionResponseOneOneDurationMinutesMax).nullish(),
+  "went_well": zod.string().max(updateSessionResponseOneOneWentWellMax).nullish(),
+  "to_improve": zod.string().max(updateSessionResponseOneOneToImproveMax).nullish()
 }).and(zod.object({
   "id": zod.number().int(),
   "question_type_name": zod.string(),
   "kind": zod.enum(['case', 'behavioral']),
   "created_at": zod.string()
+})).and(zod.object({
+  "section_scores": zod.array(zod.object({
+  "section_id": zod.number().int().min(1).max(updateSessionResponseTwoSectionScoresItemOneSectionIdMax),
+  "score": zod.number().int().min(1).max(updateSessionResponseTwoSectionScoresItemOneScoreMax),
+  "went_well": zod.string().max(updateSessionResponseTwoSectionScoresItemOneWentWellMax).nullish(),
+  "to_improve": zod.string().max(updateSessionResponseTwoSectionScoresItemOneToImproveMax).nullish()
+}).and(zod.object({
+  "id": zod.number().int(),
+  "section_name": zod.string(),
+  "display_order": zod.number().int()
+})))
 }))
 
 

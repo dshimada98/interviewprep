@@ -5,7 +5,7 @@ import { AlertCircle, ArrowLeft, CalendarDays, Clock, Loader2, Pencil, Plus, Tra
 import {
   getGetQuestionTypesQueryKey, getGetSessionQueryKey, getListSessionsQueryKey,
   useCreateSession, useDeleteSession, useGetQuestionTypes, useGetSession, useListSessions, useUpdateSession,
-  type PracticeSession, type SessionInput,
+  type PracticeSession, type PracticeSessionDetail, type SessionInput,
 } from '@workspace/api-client-react';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { sessionRequestOptions, useAuth } from '@/auth';
 import { AppHeader } from './ip';
+import { ScorecardEditor, ScorecardView, draftsFrom, draftsToInput, useCaseSections, type ScoreDrafts } from './scorecard';
 
 const FORMATS = [
   { v: 'solo', label: 'Solo' },
@@ -279,6 +280,8 @@ export function SessionDetailPage({ rawId }: { rawId?: string }) {
             ))}
           </dl>
 
+          {s.kind === 'case' && <ScorecardView scores={s.section_scores ?? []} />}
+
           <div className="ip-rise mt-6 grid gap-4 md:grid-cols-2" style={{ animationDelay: '120ms' }}>
             {([['What went well', s.went_well, 'var(--green)'], ['To improve', s.to_improve, 'var(--score-3)']] as const).map(([k, v, c]) => (
               <section key={k} className="rounded-xl border bg-white p-5 sm:p-6" style={{ borderTop: `4px solid ${c}` }}>
@@ -314,8 +317,8 @@ export function SessionDetailPage({ rawId }: { rawId?: string }) {
 
 /* ---------------- Form ---------------- */
 
-type FormVals = { session_date: string; question_type_id: string; prompt: string; format: string; overall_score: string; duration_minutes: string; went_well: string; to_improve: string };
-type Errs = Partial<Record<keyof FormVals | 'form', string>>;
+type FormVals = { scores?: ScoreDrafts; session_date: string; question_type_id: string; prompt: string; format: string; overall_score: string; duration_minutes: string; went_well: string; to_improve: string };
+type Errs = Partial<Record<Exclude<keyof FormVals, 'scores'> | 'form', string>>;
 const EMPTY: FormVals = { session_date: '', question_type_id: '', prompt: '', format: '', overall_score: '', duration_minutes: '', went_well: '', to_improve: '' };
 const SAVE_ERROR = "Couldn't save. Please check your entries.";
 
@@ -388,6 +391,9 @@ function SessionForm({ initial, submitLabel, busy, onSubmit, cancelHref, serverE
   const [v, setV] = useState<FormVals>(initial);
   const [errs, setErrs] = useState<Errs>({});
   const [kind, setKind] = useState<'case' | 'behavioral' | null>(null);
+  const [drafts, setDrafts] = useState<ScoreDrafts>(initial.scores ?? {});
+  const sections = useCaseSections();
+  use401(sections.error);
   const formRef = useRef<HTMLFormElement>(null);
   useEffect(() => { if (Object.keys(serverErrors).length) setErrs(serverErrors); }, [serverErrors]);
   useEffect(() => {
@@ -402,15 +408,20 @@ function SessionForm({ initial, submitLabel, busy, onSubmit, cancelHref, serverE
   use401(types.error);
   // Editing infers the initial kind from the saved type once reference data loads.
   const activeKind = kind ?? (types.data?.behavioral.some(t => String(t.id) === initial.question_type_id) ? 'behavioral' : 'case');
-  const set = (k: keyof FormVals) => (val: string) => setV(p => ({ ...p, [k]: val }));
+  const set = (k: Exclude<keyof FormVals, 'scores'>) => (val: string) => setV(p => ({ ...p, [k]: val }));
 
   function submit(e: FormEvent) {
     e.preventDefault();
     if (busy) return;
     const ids = new Set((types.data?.[activeKind] ?? []).map(t => t.id));
     const [er, input] = validate(v, ids);
-    setErrs(er);
-    if (input) onSubmit(input);
+    if (!input) { setErrs(er); return; }
+    if (activeKind === 'behavioral') { setErrs({}); onSubmit({ ...input, section_scores: [] }); return; }
+    // Never submit a case without the reference list; the scorecard shows a retry.
+    const sc = sections.data ? draftsToInput(drafts, sections.data) : null;
+    if (!sc) { setErrs({ form: SAVE_ERROR }); return; }
+    setErrs({});
+    onSubmit({ ...input, section_scores: sc });
   }
 
   const counter = (s: string) => <span className="tabular-nums">{s.trim().length}/4000</span>;
@@ -500,6 +511,8 @@ function SessionForm({ initial, submitLabel, busy, onSubmit, cancelHref, serverE
         {errs.overall_score && <ErrText id="score-err">{errs.overall_score}</ErrText>}
       </fieldset>
 
+      {activeKind === 'case' && types.data && <ScorecardEditor drafts={drafts} onChange={setDrafts} disabled={busy} query={sections} />}
+
       <FieldWrap id="duration_minutes" label="Duration in minutes" optional error={errs.duration_minutes} hint="Leave blank to clear.">
         <input {...aria('duration_minutes', errs.duration_minutes, true)} type="text" inputMode="numeric" data-testid="input-duration"
           className={`${inputCls} sm:max-w-[12rem]`} value={v.duration_minutes} onChange={e => set('duration_minutes')(e.target.value)} />
@@ -552,7 +565,8 @@ export function NewSessionPage() {
   );
 }
 
-const toVals = (s: PracticeSession): FormVals => ({
+const toVals = (s: PracticeSessionDetail): FormVals => ({
+  scores: draftsFrom(s.section_scores),
   session_date: s.session_date, question_type_id: String(s.question_type_id), prompt: s.prompt, format: s.format,
   overall_score: String(s.overall_score), duration_minutes: s.duration_minutes == null ? '' : String(s.duration_minutes),
   went_well: s.went_well ?? '', to_improve: s.to_improve ?? '',
