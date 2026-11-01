@@ -1,212 +1,131 @@
-# InterviewPrep — Overall Project Plan
+# PLAN.md — InterviewPrep: Case & Behavioral Interview Tracker
 
-## 1. Purpose and Scope
+## 1. Pitch
 
-InterviewPrep is a consulting case and behavioral interview preparation tracker.
-Build it incrementally, one feature at a time, so each feature can be reviewed
-and tested before the next is started.
+I'm building **InterviewPrep**, a tracker for consulting case practice and behavioral interview stories, because I'm recruiting for consulting this fall and this lives in a difficult to read spreadsheet. I want to score every case section by section, see which case types and sections are my weakest, keep my behavioral stories in one place, and walk into my next case knowing exactly what to work on.
 
-Only Feature 1 is currently specified and approved for implementation. The
-uploaded briefs refer to an existing full-product plan, but that document was
-not supplied. This plan records the available requirements and labels the
-later roadmap as provisional rather than inventing approved specifications.
+**How often:** TODO(Daisuke): 2-3 times a week*
 
-## 2. Development Rules
+## 2. Features (in build order)
 
-- Build only the feature currently requested.
-- Build later features separately, each on its own branch.
-- The user manages Git. Do not change branches, merge, or push to main.
-- Do not create future-feature screens, endpoints, or database tables early.
-- Confirm each later feature's behavior and data requirements before building it.
-- Reuse the shared authentication, layout, and theme foundations.
+1. **Sign up and login** *(spine).* As a new visitor, I want to create an account with my email and password, then log in and log out, so that my prep data is private to me.
+2. **Data model** *(spine).* As a user, I want each practice session saved with its question type (e.g. Profitability, Market Entry for cases; Leadership, Teamwork for behavioral), so that my practice is organized by what I'm being tested on.
+3. **Create / read / update / delete sessions** *(spine).* As a user, I want to log a practice session (date, question type, prompt, format, overall 1–5 score, minutes, overall notes), view my list, open a session's detail page, edit it, and delete it after an "are you sure?" confirmation, so that my log stays accurate.
+4. **Case scorecard** *(my feature 1).* As a user, I want to score each section of a case, Introduction, Framework, Exhibits, Math, Brainstorm, Recommendation, and Driving the case forward, from 1 to 5 (or mark it N/A if the case didn't include it), and write what went well and what to improve for each section, so that I know exactly which parts of a case I'm strong and weak at. The detail page shows the full scorecard, and editing a session updates its existing section scores instead of creating duplicates.
+5. **Validation** *(spine).* As a user, I want a friendly message if I leave date, question type, prompt, or overall score blank, or enter any score outside 1–5, so that I never save a half-finished or invalid entry.
+6. **Stars** *(spine).* As a user, I want to star sessions I want to redo and see them in a "Starred" view, so that I have a redo list of cases that went badly.
+7. **Find things** *(spine).* As a user, I want to search my sessions by keyword (prompt and notes), filter by kind (case/behavioral) and question type, and sort by newest, oldest, highest score, or lowest score, so that I can quickly find, say, every profitability case I scored under 3.
+8. **Dashboard** *(spine).* As a user, I want to see:
+   - my total number of cases, and the count for each case type;
+   - my average overall score;
+   - my weakest case type, meaning the lowest average overall score among types with at least 2 sessions;
+   - a bar chart of my average score for each of the 7 case sections;
+   - a section heatmap: a grid with the 7 case sections as rows and my 10 most recent cases as columns, where each cell shows that section's score colored by the score scale (blank for N/A),
 
-## 3. Technical Foundation
+   so that I know where I stand, and a weak section jumps out at a glance as a red row.
+9. **Next-case focus** *(my feature 2).* As a user, I want a "Focus for your next case" card on the dashboard. It shows the 2 sections with the lowest average score across my 5 most recent case sessions, each with my most recent "to improve" note for that section, so that I start every case with two concrete things to work on.
+10. **STAR story bank** *(my feature 3).* As a user, I want to add, edit, and delete my behavioral stories (title, context, Situation, Task, Action, Result, and main competency), and link a behavioral practice session to the story I used, so that my existing and new stories live in one place. Each story's page shows how many times I've practiced it and its average score.
 
-- **Frontend:** React.
-- **Backend:** Node.js and Express.
-- **Database:** Replit's built-in PostgreSQL.
-- **App structure:** Create and export the Express app separately from the
-  file that starts the server, so later automated tests can import the app
-  without starting a network listener.
-- **Authentication:** Custom in-app email/password authentication. Do not use
-  Replit Auth, Google login, or third-party login providers.
-- **Passwords:** Store bcrypt hashes only. Never store or log plaintext passwords.
-- **Login sessions:** Use `express-session` with PostgreSQL persistence,
-  an httpOnly cookie, and the secret read from `SESSION_SECRET`.
-- **API protection:** Use shared authentication middleware for protected API
-  routes. Unauthenticated requests return HTTP 401. Public authentication
-  endpoints must remain explicitly accessible.
+## 3. Database
 
-## 4. Shared Design Foundation
+| Table | Column | Type | Notes |
+|---|---|---|---|
+| **users** | id | number | Primary key |
+| | email | text | Unique, required |
+| | password_hash | text | Hashed, never stored in plain text |
+| | created_at | date | |
+| **question_types** | id | number | Primary key |
+| | name | text | e.g. "Profitability", "Market Sizing", "Leadership" |
+| | kind | text | "case" or "behavioral" |
+| **practice_sessions** | id | number | Primary key |
+| | user_id | number | → users.id |
+| | question_type_id | number | → question_types.id |
+| | story_id | number | → stories.id, optional (behavioral sessions only) |
+| | session_date | date | Required |
+| | prompt | text | Required, e.g. "Coffee chain profits down 15%" |
+| | format | text | "solo", "partner", or "mock" |
+| | overall_score | number | Required, 1–5, my overall judgment of the session |
+| | duration_minutes | number | Optional |
+| | went_well | text | Optional, overall notes |
+| | to_improve | text | Optional, overall notes |
+| | created_at | date | |
+| **case_sections** | id | number | Primary key |
+| | name | text | Introduction, Framework, Exhibits, Math, Brainstorm, Recommendation, Driving the case forward |
+| | display_order | number | Order the sections appear on the form |
+| **section_scores** | id | number | Primary key |
+| | session_id | number | → practice_sessions.id |
+| | section_id | number | → case_sections.id |
+| | score | number | Required, 1–5 |
+| | went_well | text | Optional |
+| | to_improve | text | Optional |
+| **stars** | user_id | number | → users.id; part of composite primary key |
+| | session_id | number | → practice_sessions.id; part of composite primary key |
+| | created_at | date | |
+| **stories** | id | number | Primary key |
+| | user_id | number | → users.id |
+| | competency_id | number | → question_types.id (behavioral kind) |
+| | title | text | Required |
+| | context | text | e.g. "FP&A, budget reforecast" |
+| | situation, task, action, result | text | STAR fields |
+| | created_at | date | |
 
-Use a clean, professional “consulting deck” style with ample white space and
-Inter as the font. Define these values once in a reusable shared theme:
+**Relationships**
 
-| Purpose | Value |
-| --- | --- |
-| Background | White (`#FFFFFF`) |
-| Header and primary text | Navy (`#1F2A44`) |
-| Cards | Light gray (`#F2F4F7`) |
-| Primary accent | Green (`#2E9E6B`) |
-| Score 1–2 | Red (`#C0392B`) |
-| Score 3 | Amber (`#D68910`) |
-| Score 4–5 | Green (`#2E9E6B`) |
+- A user has many practice sessions and many stories (one-to-many).
+- A question type has many practice sessions (one-to-many).
+- A case session has many section scores, at most one per section (one-to-many). A section marked N/A simply has no row.
+- A case section has many section scores across all sessions (one-to-many).
+- A story can be used in many behavioral sessions (one-to-many).
+- Users and sessions connect through **stars** (many-to-many).
+- `question_types` and `case_sections` are shared, pre-loaded reference data that is the same for everyone. Every other table belongs to one user, and the app only ever shows a user their own rows.
+- The overall score is entered separately rather than averaged from the sections, because interviewers judge holistically. Strong math doesn't save a missing recommendation.
 
-The score colors are theme definitions only during Feature 1; do not build
-scoring functionality yet.
+```mermaid
+erDiagram
+    users ||--o{ practice_sessions : logs
+    users ||--o{ stories : writes
+    users ||--o{ stars : gives
+    practice_sessions ||--o{ stars : receives
+    question_types ||--o{ practice_sessions : categorizes
+    question_types ||--o{ stories : "competency of"
+    practice_sessions ||--o{ section_scores : "scored by"
+    case_sections ||--o{ section_scores : "section of"
+    stories ||--o{ practice_sessions : "used in"
+```
 
-### Responsive and accessible behavior
+## 4. Tests
 
-- Design mobile-first for phones around 375px wide and for laptops.
-- Use a single-column layout on phones.
-- Make inputs and buttons at least 44px tall.
-- Prevent horizontal page scrolling.
-- Collapse header links into a compact menu on phones.
-- Keep logout accessible on every authenticated page at all screen sizes.
-- Provide visible labels, readable contrast, keyboard access, and focus states.
+1. **Data isolation.** Given User A has logged a session "Coffee chain profitability" and User B is a separate account, when User B loads their sessions list and also requests User A's session directly by its ID, then User B's list is empty and the direct request returns "not found."
+2. **Dashboard average.** Given a user has three sessions with overall scores of 3, 4, and 5, when they open the dashboard, then the average score shows 4.0.
 
-## 5. Feature 1 — Sign Up and Login
+## 5. Technologies
 
-### Goal
+- **Coding agent: Replit Agent.** It builds, runs, and hosts in one place, which matters with a four-day timeline.
+- **Database: Replit's built-in PostgreSQL.** It's a real relational database that supports the foreign keys and junction tables above, with no separate account to set up.
+- **Sign up and login: email and password, built in the app and hashed with bcrypt, with session cookies.** Every account is a row in my own users table, which makes data isolation easy to enforce and test.
+- **Hosting: Replit Deployments.** The live URL comes from the same workspace I build in, and I redeploy after each merged PR.
+- **Stack: React front end, Node/Express back end.** This is Replit Agent's default full-stack setup, so I'm working with the agent rather than against it.
+- **Libraries:** Recharts for the dashboard chart (simple React charting), and Vitest with Supertest for the two tests (can call the app's API as two different logged-in users).
+- **Version control: GitHub,** with a rule that requires a pull request to merge into main, so nothing can be committed to main directly.
 
-Let a user create an account, log in, see a protected welcome page, and log out.
+## 6. Design
 
-### Database
+- **Direction: "Consulting deck."** The app is clean and professional, with plenty of white space. The one borrowing from fitness apps: dashboard numbers are big and bold.
+- **Colors:** Navy (#1F2A44) for the header and text, a white background, light gray (#F2F4F7) stat cards, and one green accent (#2E9E6B). Red is used only for low scores and delete buttons.
+- **Score color scale, used everywhere:** 1–2 red (#C0392B), 3 amber (#D68910), 4–5 green (#2E9E6B). The number is always shown next to the color, so meaning never depends on color alone.
+- **Typography:** A clean sans-serif (Inter). Stat numbers are large and bold.
+- **Scorecard:** One compact row per section, like an interviewer's feedback form. Each row has tap buttons for 1–5 plus N/A (no dropdowns). The "went well" and "to improve" notes for a section expand when tapped, so the form stays short on a phone.
+- **Phone and laptop:** Designed for the phone first, since I'll log right after a case, but it also works well on a laptop.
+  - **On a phone (around 375px wide):** Single column, with stat cards in a 2×2 grid. The heatmap scrolls sideways inside its own box, never the whole page. Buttons and tap targets are at least 44px tall.
+  - **On a laptop:** Stat cards sit in one row, and the bar chart and heatmap sit side by side.
+- **Inspiration:**
+  - Notion, for list and detail pages
+  - Consulting slides, for big takeaway numbers
+  - Strava, for bold stats
+  - GitHub's contribution graph, for the heatmap
 
-Create a `users` table with:
+## 7. Risks and cuts
 
-| Field | Requirements |
-| --- | --- |
-| `id` | Primary key |
-| `email` | Text, unique, required, stored in lowercase |
-| `password_hash` | Text, required |
-| `created_at` | Timestamp |
-
-Create one additional PostgreSQL table solely for login-session storage.
-The user explicitly approved this exception to the original users-only
-restriction.
-
-Do not create any other tables during Feature 1. Login sessions are distinct
-from the interview practice sessions in the future roadmap.
-
-### Sign up
-
-- Fields: email, password, confirm password.
-- Require all fields.
-- Require a password of at least 8 characters.
-- Require the password and confirmation to match.
-- Store emails in lowercase so differently capitalized versions are the
-  same account.
-- Validate input on the server as well as in the frontend.
-- Hash the password with bcrypt before saving the user.
-- Enforce email uniqueness in PostgreSQL.
-- On success, establish a login session and open the welcome page.
-
-### Login
-
-- Fields: email and password.
-- Require both fields.
-- Normalize the email consistently with sign up.
-- Compare the submitted password against the stored bcrypt hash.
-- Use the same error for an unknown email and an incorrect password.
-- On success, establish a login session and open the welcome page.
-
-### Protected welcome page and header
-
-- Display exactly: **Welcome to InterviewPrep**.
-- Show the logged-in user's email.
-- Display a header with the app name **InterviewPrep** and a **Log out** button.
-- Reuse this header on every future logged-in page.
-- Redirect unauthenticated visitors to the login page.
-- Preserve login across page refreshes while the session remains valid.
-
-### Logout and session security
-
-- Destroy the server-side session and clear the cookie on logout.
-- Return the user to login and prevent subsequent access to protected content
-  without authenticating again.
-- Read `SESSION_SECRET` from the environment; never hardcode or expose it.
-- Use an httpOnly cookie and appropriate secure production cookie settings.
-- Regenerate the session when authentication succeeds.
-- Protect future API routes by default, excluding explicitly public
-  authentication endpoints.
-
-### Exact inline error messages
-
-Show errors on the page, not in browser alerts.
-
-| Condition | Message |
-| --- | --- |
-| Email already registered | An account with this email already exists. Try logging in. |
-| Wrong email or password | Email or password is incorrect. |
-| Password confirmation mismatch | Passwords don't match. |
-| Password too short | Password must be at least 8 characters. |
-| Blank required fields | Please fill in all fields. |
-
-### Acceptance checks
-
-1. A new user can sign up and reach the welcome page showing their email.
-2. Missing fields, short passwords, and mismatched confirmation show the
-   required inline messages.
-3. Duplicate emails, including differently capitalized versions, show the
-   required duplicate-account message.
-4. Valid credentials log the user in.
-5. Unknown emails and incorrect passwords show the same required error.
-6. Refreshing the welcome page preserves a valid login.
-7. Unauthenticated visits to protected pages redirect to login.
-8. Unauthenticated protected API requests return HTTP 401.
-9. Logout invalidates the session and removes access to protected content.
-10. Passwords are hashed in storage and never logged or returned.
-11. Phone and laptop layouts meet the shared design requirements.
-12. Only the users and login-session tables are introduced.
-
-### Delivery requirements
-
-When Feature 1 implementation is complete, provide:
-
-1. A list of created or changed files.
-2. A plain-English explanation of sign up, login, and logout, from clicking
-   a button through server processing and database storage.
-3. Step-by-step manual testing instructions.
-4. Instructions for adding `SESSION_SECRET` through Replit Secrets, without
-   reading or displaying an existing secret value.
-
-### Explicitly out of scope
-
-- Interview practice sessions.
-- Scorecards or scoring UI.
-- Stars.
-- Dashboard.
-- Behavioral stories.
-- Password reset, email verification, and social login.
-- Any other feature beyond Feature 1.
-
-## 6. Future Roadmap — Provisional
-
-The briefs name these future areas but do not define their requirements.
-The order below is a planning suggestion, not approved feature numbering or
-authorization to implement. None belongs in the Feature 1 build.
-
-| Area | Proposed purpose | Decisions needed before implementation |
-| --- | --- | --- |
-| Practice sessions | Track interview preparation practice. | Session types, required fields, lifecycle, editing/deletion, and differences between case and behavioral practice. |
-| Scorecards | Record assessments of practice. | Evaluation criteria, application of the 1–5 scale, who scores, and links to practice sessions. |
-| Stars | Support the intended starring or prioritization behavior. | What a star means, which items can be starred, and where they appear. |
-| Dashboard | Summarize preparation activity and progress. | Metrics, time ranges, filters, and underlying feature dependencies. |
-| Behavioral stories | Organize material for behavioral interview preparation. | Story structure, categories, editing/deletion, and links to practice. |
-
-Further capabilities require a separate request. This outline does not imply
-payments, AI coaching, social features, integrations, or other additional scope.
-
-## 7. Process for Later Features
-
-1. Confirm the feature's purpose and observable user behavior.
-2. Agree on fields, validation, empty/error states, and create/edit/delete
-   behavior where relevant.
-3. Define only the database additions required for that feature, including
-   user ownership and authorization.
-4. Have the user prepare the intended Git branch.
-5. Implement only the agreed scope using the shared foundations.
-6. Verify behavior, access control, and phone/laptop layouts.
-7. Deliver the changed-file list, explanation, and manual test instructions.
-   Leave merging and pushing to the user.
+- **Least sure I can build:** The case scorecard (feature 4). It's one form that saves to two tables, with N/A handling, and editing must update existing section scores rather than duplicate them.
+- **Cut first:** If time runs short, I'll simplify Next-case focus (feature 9) to a single "weakest section" stat. Next, I'll drop the heatmap, since the bar chart already meets the dashboard requirement. If I'm still short after that, I'll drop the link between behavioral sessions and stories, so the story bank stands alone.
+- **Backlog (only if time allows):** A practice streak counter; tagging stories with multiple competencies; and a competency coverage view showing which competencies have no story yet.
