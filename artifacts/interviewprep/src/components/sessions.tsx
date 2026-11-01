@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useLocation } from 'wouter';
-import { useQueryClient } from '@tanstack/react-query';
-import { AlertCircle, ArrowLeft, CalendarDays, Clock, Loader2, Pencil, Plus, Star, Trash2 } from 'lucide-react';
+import { keepPreviousData, useQueryClient } from '@tanstack/react-query';
+import { AlertCircle, ArrowLeft, CalendarDays, Clock, Loader2, Pencil, Plus, Search, Star, Trash2 } from 'lucide-react';
 import {
   getGetQuestionTypesQueryKey,
   useCreateSession, useDeleteSession, useGetQuestionTypes, useGetSession, useListSessions, useUpdateSession,
@@ -13,7 +13,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import { sessionRequestOptions, useAuth } from '@/auth';
 import { AppHeader } from './ip';
-import { detailKey, listKey, starredKey, statusOf } from './session-keys';
+import { detailKey, invalidateLists, listKey, removeFromLists, starredKey, statusOf } from './session-keys';
+import { ClearFilters, FinderControls, useSessionFinder } from './session-finder';
 import { STAR_ERROR, StarButton, useStarToggle, type StarToggle } from './session-stars';
 import { ScorecardEditor, ScorecardView, draftsFrom, draftsToInput, useCaseSections, type ScoreDrafts } from './scorecard';
 
@@ -139,20 +140,23 @@ function SessionCards({ data, star }: { data: PracticeSession[]; star: StarToggl
 
 export function SessionsListPage() {
   const { user } = useAuth();
-  const q = useListSessions(undefined, {
-    query: { queryKey: listKey(user?.id), enabled: !!user, refetchOnMount: 'always', retry: false },
+  const f = useSessionFinder();
+  // Each param set has its own cache key; React Query aborts the superseded request, so a late
+  // response for an old search can never overwrite the current results.
+  const q = useListSessions(f.params, {
+    query: { queryKey: listKey(user?.id, f.params), enabled: !!user && f.ready, refetchOnMount: 'always', retry: false, placeholderData: keepPreviousData },
     request: sessionRequestOptions(),
   });
   use401(q.error);
   const star = useStarToggle();
   const data = q.data;
+  const none = data && data.total === 0 && !f.active;
   return (
     <Shell title="Practice sessions">
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-5">
         <div className="ip-rise">
           <p className="text-xs font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--green-text)' }}>Practice log</p>
           <h1 className="mt-2 text-3xl sm:text-4xl font-bold tracking-tight">Your sessions</h1>
-          {data && data.length > 0 && <p className="mt-2 text-sm text-muted-foreground" data-testid="text-session-count">{data.length} logged {data.length === 1 ? 'session' : 'sessions'}, newest first</p>}
         </div>
         <Link href="/sessions/new" data-testid="link-new-session"
           className="ip-focus ip-rise min-h-11 px-5 rounded-lg inline-flex items-center justify-center gap-2 font-semibold text-white"
@@ -161,13 +165,24 @@ export function SessionsListPage() {
         </Link>
       </div>
 
-      {q.isLoading ? (
+      <FinderControls f={f} />
+      {data && (
+        <div className="mt-4 flex min-h-11 flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-muted-foreground" data-testid="text-session-count" aria-live="polite">
+            Showing <span className="font-semibold tabular-nums" style={{ color: 'var(--navy)' }}>{data.sessions.length}</span> of <span className="tabular-nums">{data.total}</span> sessions
+            {q.isFetching && <span className="sr-only"> Updating results</span>}
+          </p>
+          {f.active && <ClearFilters f={f} />}
+        </div>
+      )}
+
+      {q.isLoading || (!data && !f.ready) ? (
         <div className="mt-8 space-y-3" aria-busy="true"><span className="sr-only" role="status">Loading sessions</span>
           {[0, 1, 2].map(i => <div key={i} className="ip-skel h-24 rounded-xl" />)}
         </div>
       ) : q.error && !data ? (
         <ErrorPanel msg="Unable to load your sessions. Please try again." busy={q.isFetching} onRetry={() => void q.refetch()} />
-      ) : data && data.length === 0 ? (
+      ) : none ? (
         <div className="ip-rise mt-8 rounded-xl p-8 sm:p-12 text-center" style={{ background: 'var(--panel)' }} data-testid="status-empty">
           <div className="mx-auto w-fit"><ScoreBar score={3} size="lg" /></div>
           <h2 className="mt-5 text-xl font-bold">No sessions yet</h2>
@@ -176,7 +191,13 @@ export function SessionsListPage() {
             <Plus className="h-4 w-4" aria-hidden />Log your first session
           </Link>
         </div>
-      ) : data ? <SessionCards data={data} star={star} /> : null}
+      ) : data && data.sessions.length === 0 ? (
+        <div className="ip-rise mt-6 rounded-xl border border-dashed p-8 sm:p-10 text-center" data-testid="status-no-results">
+          <Search className="mx-auto h-7 w-7 text-muted-foreground" aria-hidden />
+          <p className="mt-3 font-semibold">No sessions match your search.</p>
+          <div className="mt-5"><ClearFilters f={f} solid /></div>
+        </div>
+      ) : data ? <div className={q.isPlaceholderData ? 'opacity-60 transition-opacity' : 'transition-opacity'}><SessionCards data={data.sessions} star={star} /></div> : null}
     </Shell>
   );
 }
@@ -189,7 +210,7 @@ export function StarredPage() {
   });
   use401(q.error);
   const star = useStarToggle();
-  const data = q.data;
+  const data = q.data?.sessions;
   // Errors for cards no longer shown (e.g. removed from this list) stay visible here.
   const orphanErr = Object.keys(star.errors).some(id => !data?.some(s => String(s.id) === id));
   return (
@@ -262,14 +283,13 @@ export function SessionDetailPage({ rawId }: { rawId?: string }) {
     del.mutate({ id }, {
       onSuccess: () => {
         qc.removeQueries({ queryKey: detailKey(id, user?.id) });
-        qc.setQueryData<PracticeSession[]>(listKey(user?.id), old => old?.filter(s => s.id !== id));
-        qc.setQueryData<PracticeSession[]>(starredKey(user?.id), old => old?.filter(s => s.id !== id));
-        void qc.invalidateQueries({ queryKey: listKey(user?.id) }); void qc.invalidateQueries({ queryKey: starredKey(user?.id) });
+        removeFromLists(qc, user?.id, id);
+        void invalidateLists(qc, user?.id);
         setOpen(false);
         nav('/sessions');
       },
       onError: (e) => {
-        if (statusOf(e) === 404) { setOpen(false); qc.removeQueries({ queryKey: detailKey(id, user?.id) }); void qc.invalidateQueries({ queryKey: listKey(user?.id) }); void qc.invalidateQueries({ queryKey: starredKey(user?.id) }); nav('/sessions'); return; }
+        if (statusOf(e) === 404) { setOpen(false); qc.removeQueries({ queryKey: detailKey(id, user?.id) }); void invalidateLists(qc, user?.id); nav('/sessions'); return; }
         setOpen(false);
         setDelErr('Unable to delete this session. Please try again.');
       },
@@ -643,7 +663,7 @@ export function NewSessionPage() {
         onSubmit={(data) => create.mutate({ data }, {
           onSuccess: (s) => {
             qc.setQueryData(detailKey(s.id, user?.id), s);
-            void qc.invalidateQueries({ queryKey: listKey(user?.id) }); void qc.invalidateQueries({ queryKey: starredKey(user?.id) });
+            void invalidateLists(qc, user?.id);
             nav(`/sessions/${s.id}`);
           },
           onError: (e) => setSrvErr(serverErrs(e)),
@@ -690,7 +710,7 @@ export function EditSessionPage({ rawId }: { rawId?: string }) {
             onSubmit={(data) => update.mutate({ id, data }, {
               onSuccess: (s) => {
                 qc.setQueryData(detailKey(s.id, user?.id), s);
-                void qc.invalidateQueries({ queryKey: listKey(user?.id) }); void qc.invalidateQueries({ queryKey: starredKey(user?.id) });
+                void invalidateLists(qc, user?.id);
                 snap.current = null;
                 nav(`/sessions/${s.id}`);
               },

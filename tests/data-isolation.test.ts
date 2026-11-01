@@ -77,9 +77,11 @@ describe('practice-session data isolation', () => {
     expect(owned.rows[0].user_id).toBe(userA.id);
 
     const aList = await userA.agent.get('/api/sessions').expect(200);
-    expect(aList.body.map((session: { id: number }) => session.id)).toContain(id);
+    expect(aList.body.sessions.map((session: { id: number }) => session.id)).toContain(id);
     const bList = await userB.agent.get('/api/sessions').expect(200);
-    expect(bList.body).toEqual([]);
+    expect(bList.body).toEqual({ sessions: [], total: 0 });
+    const bSearch = await userB.agent.get('/api/sessions').query({ q: 'Coffee chain' }).expect(200);
+    expect(bSearch.body.sessions).toEqual([]);
 
     const hidden = await userB.agent.get(`/api/sessions/${id}`).expect(404);
     expect(hidden.body).toEqual({ message: 'Session not found' });

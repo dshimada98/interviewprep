@@ -26,9 +26,9 @@ import type {
   HealthStatus,
   InvalidSessionResponse,
   ListSessionsParams,
-  PracticeSession,
   PracticeSessionDetail,
-  SessionInput
+  SessionInput,
+  SessionList
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -150,9 +150,9 @@ export const getListSessionsUrl = (params?: ListSessionsParams,) => {
   return stringifiedParams.length > 0 ? `/api/sessions?${stringifiedParams}` : `/api/sessions`
 }
 
-export const listSessions = async (params?: ListSessionsParams, options?: Parameters<typeof customFetch>[1]): Promise<PracticeSession[]> => {
+export const listSessions = async (params?: ListSessionsParams, options?: Parameters<typeof customFetch>[1]): Promise<SessionList> => {
 
-  return customFetch<PracticeSession[]>(getListSessionsUrl(params),
+  return customFetch<SessionList>(getListSessionsUrl(params),
   {
     ...options,
     method: 'GET'

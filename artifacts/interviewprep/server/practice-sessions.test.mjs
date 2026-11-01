@@ -53,12 +53,12 @@ test('private practice-session CRUD and validation', async t => {
       assert.ok(!('user_id' in saved));
       const row = (await pool.query('SELECT user_id FROM practice_sessions WHERE id=$1', [saved.id])).rows[0];
       assert.equal(row.user_id, a.id);
-      assert.equal((await a.agent.get('/api/sessions').expect(200)).body[0].id, saved.id);
+      assert.equal((await a.agent.get('/api/sessions').expect(200)).body.sessions[0].id, saved.id);
       assert.deepEqual((await a.agent.get(`/api/sessions/${saved.id}`).expect(200)).body, saved);
       assert.equal((await a.agent.get(`/api/sessions/${saved.id}`).expect(200)).headers['cache-control'], 'no-store');
     });
     await t.test('foreign list is empty and direct read/update/delete return not found without mutation', async () => {
-      assert.deepEqual((await b.agent.get('/api/sessions').expect(200)).body, []);
+      assert.deepEqual((await b.agent.get('/api/sessions').expect(200)).body, { sessions: [], total: 0 });
       const missing = (await b.agent.get('/api/sessions/2147483647').expect(404)).body;
       assert.deepEqual((await b.agent.get(`/api/sessions/${saved.id}`).expect(404)).body, missing);
       assert.deepEqual((await write('put', b, `/api/sessions/${saved.id}`, {}).expect(404)).body, missing);
@@ -96,7 +96,7 @@ test('private practice-session CRUD and validation', async t => {
           assert.ok((await write(method, a, path, body).expect(400)).body.errors[field]);
         }
       }
-      assert.equal((await a.agent.get('/api/sessions').expect(200)).body.length, 1);
+      assert.equal((await a.agent.get('/api/sessions').expect(200)).body.sessions.length, 1);
       assert.deepEqual((await a.agent.get(`/api/sessions/${saved.id}`).expect(200)).body, saved);
     });
     await t.test('returns exact friendly field errors and rejects a direct logged-in blank-prompt request', async () => {
@@ -118,7 +118,7 @@ test('private practice-session CRUD and validation', async t => {
         const future = await write(method, a, path, { ...valid, session_date: '9999-12-31' }).expect(400);
         assert.equal(future.body.errors.session_date, "The date can't be in the future.");
       }
-      assert.equal((await a.agent.get('/api/sessions').expect(200)).body.length, 1);
+      assert.equal((await a.agent.get('/api/sessions').expect(200)).body.sessions.length, 1);
       assert.deepEqual((await a.agent.get(`/api/sessions/${saved.id}`).expect(200)).body, saved);
     });
     await t.test('accepts today, trimmed prompts, and the duration upper boundary', async () => {
@@ -145,7 +145,7 @@ test('private practice-session CRUD and validation', async t => {
       assert.equal(result.body.went_well, null);
       assert.equal(result.body.to_improve, null);
       assert.equal(result.body.overall_score, 5);
-      assert.equal((await a.agent.get('/api/sessions').expect(200)).body.length, 1);
+      assert.equal((await a.agent.get('/api/sessions').expect(200)).body.sessions.length, 1);
       assert.deepEqual((await a.agent.get(`/api/sessions/${saved.id}`).expect(200)).body, result.body);
     });
     await t.test('supports omitted optional fields, minimum minutes, score bounds and newest-first list', async () => {
@@ -156,7 +156,7 @@ test('private practice-session CRUD and validation', async t => {
         }).expect(201);
         assert.equal(result.body.duration_minutes, minutes ?? null);
       }
-      const list = (await a.agent.get('/api/sessions').expect(200)).body;
+      const list = (await a.agent.get('/api/sessions').expect(200)).body.sessions;
       assert.deepEqual(list.map(s => s.session_date), ['2026-01-01', '2025-01-01', '2024-02-29']);
     });
     await t.test('invalid IDs and missing rows consistently return not found', async () => {
@@ -170,7 +170,7 @@ test('private practice-session CRUD and validation', async t => {
       await write('delete', a, `/api/sessions/${saved.id}`).expect(204);
       await a.agent.get(`/api/sessions/${saved.id}`).expect(404);
       await write('delete', a, `/api/sessions/${saved.id}`).expect(404);
-      assert.ok(!(await a.agent.get('/api/sessions').expect(200)).body.some(row => row.id === saved.id));
+      assert.ok(!(await a.agent.get('/api/sessions').expect(200)).body.sessions.some(row => row.id === saved.id));
       assert.equal((await pool.query('SELECT id FROM practice_sessions WHERE id=$1', [saved.id])).rowCount, 0);
     });
   } finally {
