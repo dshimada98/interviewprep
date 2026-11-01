@@ -83,6 +83,22 @@ describe('practice-session data isolation', () => {
     const bSearch = await userB.agent.get('/api/sessions').query({ q: 'Coffee chain' }).expect(200);
     expect(bSearch.body.sessions).toEqual([]);
 
+    const story = await userA.agent.post('/api/stories')
+      .set('X-CSRF-Token', userA.csrfToken)
+      .send({ title: 'A private leadership story', competency_id: types.body.behavioral[0].id })
+      .expect(201);
+    const hiddenStory = await userB.agent.get(`/api/stories/${story.body.id}`).expect(404);
+    expect(hiddenStory.body).toEqual({ message: 'Story not found' });
+    const rejectedLink = await userB.agent.post('/api/sessions')
+      .set('X-CSRF-Token', userB.csrfToken)
+      .send({
+        session_date: '2025-01-01', question_type_id: types.body.behavioral[0].id,
+        prompt: 'Attempt to use another user’s story', format: 'solo', overall_score: 3,
+        story_id: story.body.id,
+      }).expect(400);
+    expect(rejectedLink.body.errors.story_id).toBe('Please choose one of your stories.');
+    expect((await userB.agent.get('/api/sessions').expect(200)).body.sessions).toEqual([]);
+
     const hidden = await userB.agent.get(`/api/sessions/${id}`).expect(404);
     expect(hidden.body).toEqual({ message: 'Session not found' });
     const missing = await userB.agent.get('/api/sessions/2147483647').expect(404);

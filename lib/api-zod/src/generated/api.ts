@@ -8,6 +8,231 @@
 import * as zod from 'zod';
 
 
+export const ListStoriesQueryParams = zod.object({
+  "competency": zod.coerce.number().int().optional()
+})
+
+export const listStoriesResponseOneTitleMax = 300;
+
+export const listStoriesResponseOneCompetencyIdMax = 2147483647;
+
+export const listStoriesResponseOneContextMax = 4000;
+
+export const listStoriesResponseOneSituationMax = 4000;
+
+export const listStoriesResponseOneTaskMax = 4000;
+
+export const listStoriesResponseOneActionMax = 4000;
+
+export const listStoriesResponseOneResultMax = 4000;
+
+
+
+export const ListStoriesResponseItem = zod.object({
+  "title": zod.string().min(1).max(listStoriesResponseOneTitleMax),
+  "competency_id": zod.number().int().min(1).max(listStoriesResponseOneCompetencyIdMax).describe('Must reference a behavioral question type.'),
+  "context": zod.string().max(listStoriesResponseOneContextMax).nullish(),
+  "situation": zod.string().max(listStoriesResponseOneSituationMax).nullish(),
+  "task": zod.string().max(listStoriesResponseOneTaskMax).nullish(),
+  "action": zod.string().max(listStoriesResponseOneActionMax).nullish(),
+  "result": zod.string().max(listStoriesResponseOneResultMax).nullish()
+}).and(zod.object({
+  "id": zod.number().int(),
+  "competency_name": zod.string(),
+  "created_at": zod.string(),
+  "times_practiced": zod.number().int(),
+  "average_score": zod.number().nullable()
+}))
+export const ListStoriesResponse = zod.array(ListStoriesResponseItem)
+
+
+export const createStoryBodyTitleMax = 300;
+
+export const createStoryBodyCompetencyIdMax = 2147483647;
+
+export const createStoryBodyContextMax = 4000;
+
+export const createStoryBodySituationMax = 4000;
+
+export const createStoryBodyTaskMax = 4000;
+
+export const createStoryBodyActionMax = 4000;
+
+export const createStoryBodyResultMax = 4000;
+
+
+
+export const CreateStoryBody = zod.object({
+  "title": zod.string().min(1).max(createStoryBodyTitleMax),
+  "competency_id": zod.number().int().min(1).max(createStoryBodyCompetencyIdMax).describe('Must reference a behavioral question type.'),
+  "context": zod.string().max(createStoryBodyContextMax).nullish(),
+  "situation": zod.string().max(createStoryBodySituationMax).nullish(),
+  "task": zod.string().max(createStoryBodyTaskMax).nullish(),
+  "action": zod.string().max(createStoryBodyActionMax).nullish(),
+  "result": zod.string().max(createStoryBodyResultMax).nullish()
+})
+
+export const createStoryResponseOneOneTitleMax = 300;
+
+export const createStoryResponseOneOneCompetencyIdMax = 2147483647;
+
+export const createStoryResponseOneOneContextMax = 4000;
+
+export const createStoryResponseOneOneSituationMax = 4000;
+
+export const createStoryResponseOneOneTaskMax = 4000;
+
+export const createStoryResponseOneOneActionMax = 4000;
+
+export const createStoryResponseOneOneResultMax = 4000;
+
+
+
+export const CreateStoryResponse = zod.object({
+  "title": zod.string().min(1).max(createStoryResponseOneOneTitleMax),
+  "competency_id": zod.number().int().min(1).max(createStoryResponseOneOneCompetencyIdMax).describe('Must reference a behavioral question type.'),
+  "context": zod.string().max(createStoryResponseOneOneContextMax).nullish(),
+  "situation": zod.string().max(createStoryResponseOneOneSituationMax).nullish(),
+  "task": zod.string().max(createStoryResponseOneOneTaskMax).nullish(),
+  "action": zod.string().max(createStoryResponseOneOneActionMax).nullish(),
+  "result": zod.string().max(createStoryResponseOneOneResultMax).nullish()
+}).and(zod.object({
+  "id": zod.number().int(),
+  "competency_name": zod.string(),
+  "created_at": zod.string(),
+  "times_practiced": zod.number().int(),
+  "average_score": zod.number().nullable()
+})).and(zod.object({
+  "sessions": zod.array(zod.object({
+  "id": zod.number().int(),
+  "session_date": zod.coerce.date(),
+  "prompt": zod.string(),
+  "overall_score": zod.number().int()
+}))
+}))
+
+
+export const GetStoryParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const getStoryResponseOneOneTitleMax = 300;
+
+export const getStoryResponseOneOneCompetencyIdMax = 2147483647;
+
+export const getStoryResponseOneOneContextMax = 4000;
+
+export const getStoryResponseOneOneSituationMax = 4000;
+
+export const getStoryResponseOneOneTaskMax = 4000;
+
+export const getStoryResponseOneOneActionMax = 4000;
+
+export const getStoryResponseOneOneResultMax = 4000;
+
+
+
+export const GetStoryResponse = zod.object({
+  "title": zod.string().min(1).max(getStoryResponseOneOneTitleMax),
+  "competency_id": zod.number().int().min(1).max(getStoryResponseOneOneCompetencyIdMax).describe('Must reference a behavioral question type.'),
+  "context": zod.string().max(getStoryResponseOneOneContextMax).nullish(),
+  "situation": zod.string().max(getStoryResponseOneOneSituationMax).nullish(),
+  "task": zod.string().max(getStoryResponseOneOneTaskMax).nullish(),
+  "action": zod.string().max(getStoryResponseOneOneActionMax).nullish(),
+  "result": zod.string().max(getStoryResponseOneOneResultMax).nullish()
+}).and(zod.object({
+  "id": zod.number().int(),
+  "competency_name": zod.string(),
+  "created_at": zod.string(),
+  "times_practiced": zod.number().int(),
+  "average_score": zod.number().nullable()
+})).and(zod.object({
+  "sessions": zod.array(zod.object({
+  "id": zod.number().int(),
+  "session_date": zod.coerce.date(),
+  "prompt": zod.string(),
+  "overall_score": zod.number().int()
+}))
+}))
+
+
+export const UpdateStoryParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const updateStoryBodyTitleMax = 300;
+
+export const updateStoryBodyCompetencyIdMax = 2147483647;
+
+export const updateStoryBodyContextMax = 4000;
+
+export const updateStoryBodySituationMax = 4000;
+
+export const updateStoryBodyTaskMax = 4000;
+
+export const updateStoryBodyActionMax = 4000;
+
+export const updateStoryBodyResultMax = 4000;
+
+
+
+export const UpdateStoryBody = zod.object({
+  "title": zod.string().min(1).max(updateStoryBodyTitleMax),
+  "competency_id": zod.number().int().min(1).max(updateStoryBodyCompetencyIdMax).describe('Must reference a behavioral question type.'),
+  "context": zod.string().max(updateStoryBodyContextMax).nullish(),
+  "situation": zod.string().max(updateStoryBodySituationMax).nullish(),
+  "task": zod.string().max(updateStoryBodyTaskMax).nullish(),
+  "action": zod.string().max(updateStoryBodyActionMax).nullish(),
+  "result": zod.string().max(updateStoryBodyResultMax).nullish()
+})
+
+export const updateStoryResponseOneOneTitleMax = 300;
+
+export const updateStoryResponseOneOneCompetencyIdMax = 2147483647;
+
+export const updateStoryResponseOneOneContextMax = 4000;
+
+export const updateStoryResponseOneOneSituationMax = 4000;
+
+export const updateStoryResponseOneOneTaskMax = 4000;
+
+export const updateStoryResponseOneOneActionMax = 4000;
+
+export const updateStoryResponseOneOneResultMax = 4000;
+
+
+
+export const UpdateStoryResponse = zod.object({
+  "title": zod.string().min(1).max(updateStoryResponseOneOneTitleMax),
+  "competency_id": zod.number().int().min(1).max(updateStoryResponseOneOneCompetencyIdMax).describe('Must reference a behavioral question type.'),
+  "context": zod.string().max(updateStoryResponseOneOneContextMax).nullish(),
+  "situation": zod.string().max(updateStoryResponseOneOneSituationMax).nullish(),
+  "task": zod.string().max(updateStoryResponseOneOneTaskMax).nullish(),
+  "action": zod.string().max(updateStoryResponseOneOneActionMax).nullish(),
+  "result": zod.string().max(updateStoryResponseOneOneResultMax).nullish()
+}).and(zod.object({
+  "id": zod.number().int(),
+  "competency_name": zod.string(),
+  "created_at": zod.string(),
+  "times_practiced": zod.number().int(),
+  "average_score": zod.number().nullable()
+})).and(zod.object({
+  "sessions": zod.array(zod.object({
+  "id": zod.number().int(),
+  "session_date": zod.coerce.date(),
+  "prompt": zod.string(),
+  "overall_score": zod.number().int()
+}))
+}))
+
+
+export const DeleteStoryParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const DeleteStoryResponse = zod.void()
+
+
 /**
  * @summary Private practice dashboard computed from owned sessions
  */
@@ -80,6 +305,8 @@ export const ListSessionsQueryParams = zod.object({
   "starred": zod.coerce.boolean().optional().describe('When true, return only the current user\'s starred sessions.')
 })
 
+export const listSessionsResponseSessionsItemOneStoryIdMax = 2147483647;
+
 export const listSessionsResponseSessionsItemOneSectionScoresItemSectionIdMax = 2147483647;
 
 export const listSessionsResponseSessionsItemOneSectionScoresItemScoreMax = 5;
@@ -107,6 +334,7 @@ export const listSessionsResponseSessionsItemOneToImproveMax = 4000;
 
 export const ListSessionsResponse = zod.object({
   "sessions": zod.array(zod.object({
+  "story_id": zod.number().int().min(1).max(listSessionsResponseSessionsItemOneStoryIdMax).nullable().describe('Optional owned story for behavioral sessions. Omitted/null clears the link; a case session always clears it.'),
   "section_scores": zod.array(zod.object({
   "section_id": zod.number().int().min(1).max(listSessionsResponseSessionsItemOneSectionScoresItemSectionIdMax),
   "score": zod.number().int().min(1).max(listSessionsResponseSessionsItemOneSectionScoresItemScoreMax),
@@ -122,6 +350,8 @@ export const ListSessionsResponse = zod.object({
   "went_well": zod.string().max(listSessionsResponseSessionsItemOneWentWellMax).nullish(),
   "to_improve": zod.string().max(listSessionsResponseSessionsItemOneToImproveMax).nullish()
 }).and(zod.object({
+  "story_id": zod.number().int().nullable(),
+  "story_title": zod.string().nullable(),
   "starred": zod.boolean(),
   "id": zod.number().int(),
   "question_type_name": zod.string(),
@@ -131,6 +361,8 @@ export const ListSessionsResponse = zod.object({
   "total": zod.number().int().describe('Total number of sessions owned by this user, before search or filters.')
 })
 
+
+export const createSessionBodyStoryIdMax = 2147483647;
 
 export const createSessionBodySectionScoresItemSectionIdMax = 2147483647;
 
@@ -158,6 +390,7 @@ export const createSessionBodyToImproveMax = 4000;
 
 
 export const CreateSessionBody = zod.object({
+  "story_id": zod.number().int().min(1).max(createSessionBodyStoryIdMax).nullish().describe('Optional owned story for behavioral sessions. Omitted/null clears the link; a case session always clears it.'),
   "section_scores": zod.array(zod.object({
   "section_id": zod.number().int().min(1).max(createSessionBodySectionScoresItemSectionIdMax),
   "score": zod.number().int().min(1).max(createSessionBodySectionScoresItemScoreMax),
@@ -173,6 +406,8 @@ export const CreateSessionBody = zod.object({
   "went_well": zod.string().max(createSessionBodyWentWellMax).nullish(),
   "to_improve": zod.string().max(createSessionBodyToImproveMax).nullish()
 })
+
+export const createSessionResponseOneOneStoryIdMax = 2147483647;
 
 export const createSessionResponseOneOneSectionScoresItemSectionIdMax = 2147483647;
 
@@ -208,6 +443,7 @@ export const createSessionResponseTwoSectionScoresItemOneToImproveMax = 4000;
 
 
 export const CreateSessionResponse = zod.object({
+  "story_id": zod.number().int().min(1).max(createSessionResponseOneOneStoryIdMax).nullable().describe('Optional owned story for behavioral sessions. Omitted/null clears the link; a case session always clears it.'),
   "section_scores": zod.array(zod.object({
   "section_id": zod.number().int().min(1).max(createSessionResponseOneOneSectionScoresItemSectionIdMax),
   "score": zod.number().int().min(1).max(createSessionResponseOneOneSectionScoresItemScoreMax),
@@ -223,6 +459,8 @@ export const CreateSessionResponse = zod.object({
   "went_well": zod.string().max(createSessionResponseOneOneWentWellMax).nullish(),
   "to_improve": zod.string().max(createSessionResponseOneOneToImproveMax).nullish()
 }).and(zod.object({
+  "story_id": zod.number().int().nullable(),
+  "story_title": zod.string().nullable(),
   "starred": zod.boolean(),
   "id": zod.number().int(),
   "question_type_name": zod.string(),
@@ -266,6 +504,8 @@ export const GetSessionParams = zod.object({
   "id": zod.coerce.number().int()
 })
 
+export const getSessionResponseOneOneStoryIdMax = 2147483647;
+
 export const getSessionResponseOneOneSectionScoresItemSectionIdMax = 2147483647;
 
 export const getSessionResponseOneOneSectionScoresItemScoreMax = 5;
@@ -300,6 +540,7 @@ export const getSessionResponseTwoSectionScoresItemOneToImproveMax = 4000;
 
 
 export const GetSessionResponse = zod.object({
+  "story_id": zod.number().int().min(1).max(getSessionResponseOneOneStoryIdMax).nullable().describe('Optional owned story for behavioral sessions. Omitted/null clears the link; a case session always clears it.'),
   "section_scores": zod.array(zod.object({
   "section_id": zod.number().int().min(1).max(getSessionResponseOneOneSectionScoresItemSectionIdMax),
   "score": zod.number().int().min(1).max(getSessionResponseOneOneSectionScoresItemScoreMax),
@@ -315,6 +556,8 @@ export const GetSessionResponse = zod.object({
   "went_well": zod.string().max(getSessionResponseOneOneWentWellMax).nullish(),
   "to_improve": zod.string().max(getSessionResponseOneOneToImproveMax).nullish()
 }).and(zod.object({
+  "story_id": zod.number().int().nullable(),
+  "story_title": zod.string().nullable(),
   "starred": zod.boolean(),
   "id": zod.number().int(),
   "question_type_name": zod.string(),
@@ -337,6 +580,8 @@ export const GetSessionResponse = zod.object({
 export const UpdateSessionParams = zod.object({
   "id": zod.coerce.number().int()
 })
+
+export const updateSessionBodyStoryIdMax = 2147483647;
 
 export const updateSessionBodySectionScoresItemSectionIdMax = 2147483647;
 
@@ -364,6 +609,7 @@ export const updateSessionBodyToImproveMax = 4000;
 
 
 export const UpdateSessionBody = zod.object({
+  "story_id": zod.number().int().min(1).max(updateSessionBodyStoryIdMax).nullish().describe('Optional owned story for behavioral sessions. Omitted/null clears the link; a case session always clears it.'),
   "section_scores": zod.array(zod.object({
   "section_id": zod.number().int().min(1).max(updateSessionBodySectionScoresItemSectionIdMax),
   "score": zod.number().int().min(1).max(updateSessionBodySectionScoresItemScoreMax),
@@ -379,6 +625,8 @@ export const UpdateSessionBody = zod.object({
   "went_well": zod.string().max(updateSessionBodyWentWellMax).nullish(),
   "to_improve": zod.string().max(updateSessionBodyToImproveMax).nullish()
 })
+
+export const updateSessionResponseOneOneStoryIdMax = 2147483647;
 
 export const updateSessionResponseOneOneSectionScoresItemSectionIdMax = 2147483647;
 
@@ -414,6 +662,7 @@ export const updateSessionResponseTwoSectionScoresItemOneToImproveMax = 4000;
 
 
 export const UpdateSessionResponse = zod.object({
+  "story_id": zod.number().int().min(1).max(updateSessionResponseOneOneStoryIdMax).nullable().describe('Optional owned story for behavioral sessions. Omitted/null clears the link; a case session always clears it.'),
   "section_scores": zod.array(zod.object({
   "section_id": zod.number().int().min(1).max(updateSessionResponseOneOneSectionScoresItemSectionIdMax),
   "score": zod.number().int().min(1).max(updateSessionResponseOneOneSectionScoresItemScoreMax),
@@ -429,6 +678,8 @@ export const UpdateSessionResponse = zod.object({
   "went_well": zod.string().max(updateSessionResponseOneOneWentWellMax).nullish(),
   "to_improve": zod.string().max(updateSessionResponseOneOneToImproveMax).nullish()
 }).and(zod.object({
+  "story_id": zod.number().int().nullable(),
+  "story_title": zod.string().nullable(),
   "starred": zod.boolean(),
   "id": zod.number().int(),
   "question_type_name": zod.string(),

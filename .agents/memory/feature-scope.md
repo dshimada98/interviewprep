@@ -26,3 +26,9 @@ A brand-new account's empty dashboard is a critical user path.
 **Why:** The user explicitly plans to sign up live during a demo and called out avoiding broken charts or “NaN” with no sessions.
 
 **How to apply:** Check zero-session accounts alongside populated accounts when changing the dashboard or post-login landing page.
+
+A story has one main behavioral competency, but the session dropdown includes all of the user's stories, with matching competencies first.
+
+**Why:** The story-bank brief explicitly requests all owned stories ordered with matches first, and excludes multi-competency tags.
+
+**How to apply:** Do not restrict links to stories whose competency equals the session's question type. Ownership and behavioral session kind are required; matching only affects ordering.

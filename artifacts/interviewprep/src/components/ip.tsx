@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, Redirect, useLocation } from 'wouter';
-import { Menu, X, LogOut, AlertCircle, Loader2, ListChecks, Star, LayoutDashboard } from 'lucide-react';
+import { Menu, X, LogOut, AlertCircle, Loader2, ListChecks, Star, LayoutDashboard, BookOpen } from 'lucide-react';
 import { useAuth, messages } from '@/auth';
 
 const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -199,11 +199,12 @@ export function AppHeader() {
     <header className="text-white" style={{ background: 'var(--navy)' }}>
       <div className="max-w-6xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between gap-4">
         <Link href="/dashboard" className="ip-focus min-h-11 inline-flex items-center rounded"><Mark /></Link>
-        <div className="hidden lg:flex items-center gap-4">
+        <div className="hidden lg:flex items-center gap-1 xl:gap-2">
           <Link href="/dashboard" data-testid="link-nav-dashboard" className="ip-focus min-h-11 px-3 rounded-lg inline-flex items-center gap-2 font-semibold hover:bg-white/10"><LayoutDashboard className="h-4 w-4" aria-hidden />Dashboard</Link>
           <Link href="/sessions" data-testid="link-nav-sessions" className="ip-focus min-h-11 px-3 rounded-lg inline-flex items-center gap-2 font-semibold hover:bg-white/10"><ListChecks className="h-4 w-4" aria-hidden />Sessions</Link>
           <Link href="/starred" data-testid="link-nav-starred" className="ip-focus min-h-11 px-3 rounded-lg inline-flex items-center gap-2 font-semibold hover:bg-white/10"><Star className="h-4 w-4" aria-hidden />Starred</Link>
-          <Link href="/sessions/new" data-testid="link-nav-log-session" className="ip-focus min-h-11 px-3 rounded-lg inline-flex items-center justify-center whitespace-nowrap font-semibold border border-white/30">+ Log session</Link>
+          <Link href="/stories" data-testid="link-nav-stories" className="ip-focus min-h-11 px-3 rounded-lg inline-flex items-center gap-2 font-semibold hover:bg-white/10"><BookOpen className="h-4 w-4" aria-hidden />Stories</Link>
+          <Link href="/sessions/new" data-testid="link-nav-log-session" className="ip-focus ml-1 min-h-11 px-3 rounded-lg inline-flex items-center justify-center whitespace-nowrap font-semibold border border-white/30">+ Log session</Link>
           <span className="hidden xl:inline text-sm text-white/75 truncate max-w-[10rem]">{user?.email}</span>
           {btn}
         </div>
@@ -217,6 +218,7 @@ export function AppHeader() {
           <Link href="/dashboard" onClick={() => setOpen(false)} data-testid="link-mobile-dashboard" className="ip-focus min-h-11 w-full rounded-lg inline-flex items-center justify-center gap-2 font-semibold border border-white/30"><LayoutDashboard className="h-4 w-4" aria-hidden />Dashboard</Link>
           <Link href="/sessions" onClick={() => setOpen(false)} className="ip-focus min-h-11 w-full rounded-lg inline-flex items-center justify-center gap-2 font-semibold border border-white/30"><ListChecks className="h-4 w-4" aria-hidden />Sessions</Link>
           <Link href="/starred" onClick={() => setOpen(false)} data-testid="link-mobile-starred" className="ip-focus min-h-11 w-full rounded-lg inline-flex items-center justify-center gap-2 font-semibold border border-white/30"><Star className="h-4 w-4" aria-hidden />Starred</Link>
+          <Link href="/stories" onClick={() => setOpen(false)} data-testid="link-mobile-stories" className="ip-focus min-h-11 w-full rounded-lg inline-flex items-center justify-center gap-2 font-semibold border border-white/30"><BookOpen className="h-4 w-4" aria-hidden />Stories</Link>
           <Link href="/sessions/new" onClick={() => setOpen(false)} className="ip-focus min-h-11 w-full rounded-lg inline-flex items-center justify-center font-semibold border border-white/30">+ Log session</Link>
           <p className="text-sm text-white/75 break-all">{user?.email}</p>
           <div className="[&>button]:w-full [&>button]:justify-center">{btn}</div>
