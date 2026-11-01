@@ -25,6 +25,7 @@ import type {
   GroupedQuestionTypes,
   HealthStatus,
   InvalidSessionResponse,
+  ListSessionsParams,
   PracticeSession,
   PracticeSessionDetail,
   SessionInput
@@ -134,17 +135,24 @@ export function useGetCaseSections<TData = Awaited<ReturnType<typeof getCaseSect
 
 
 
-export const getListSessionsUrl = () => {
+export const getListSessionsUrl = (params?: ListSessionsParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/sessions`
+  return stringifiedParams.length > 0 ? `/api/sessions?${stringifiedParams}` : `/api/sessions`
 }
 
-export const listSessions = async ( options?: Parameters<typeof customFetch>[1]): Promise<PracticeSession[]> => {
+export const listSessions = async (params?: ListSessionsParams, options?: Parameters<typeof customFetch>[1]): Promise<PracticeSession[]> => {
 
-  return customFetch<PracticeSession[]>(getListSessionsUrl(),
+  return customFetch<PracticeSession[]>(getListSessionsUrl(params),
   {
     ...options,
     method: 'GET'
@@ -157,23 +165,23 @@ export const listSessions = async ( options?: Parameters<typeof customFetch>[1])
 
 
 
-export const getListSessionsQueryKey = () => {
+export const getListSessionsQueryKey = (params?: ListSessionsParams,) => {
     return [
-    `/api/sessions`
+    `/api/sessions`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getListSessionsQueryOptions = <TData = Awaited<ReturnType<typeof listSessions>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSessions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getListSessionsQueryOptions = <TData = Awaited<ReturnType<typeof listSessions>>, TError = ErrorType<unknown>>(params?: ListSessionsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSessions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getListSessionsQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getListSessionsQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listSessions>>> = ({ signal }) => listSessions({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listSessions>>> = ({ signal }) => listSessions(params, { signal, ...requestOptions });
 
 
 
@@ -188,11 +196,11 @@ export type ListSessionsQueryError = ErrorType<unknown>
 
 
 export function useListSessions<TData = Awaited<ReturnType<typeof listSessions>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSessions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: ListSessionsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSessions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getListSessionsQueryOptions(options)
+  const queryOptions = getListSessionsQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -285,6 +293,154 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getCreateSessionMutationOptions(options));
+    }
+
+export const getStarSessionUrl = (id: number,) => {
+
+
+
+
+  return `/api/sessions/${id}/star`
+}
+
+/**
+ * @summary Star an owned session, idempotently
+ */
+export const starSession = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getStarSessionUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getStarSessionMutationKey = () => ['starSession'] as const;
+
+export const getStarSessionMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof starSession>>, TError,StarSessionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof starSession>>, TError,StarSessionMutationVariables, TContext> => {
+
+const mutationKey = getStarSessionMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof starSession>>, StarSessionMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  starSession(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type StarSessionMutationResult = NonNullable<Awaited<ReturnType<typeof starSession>>>
+
+    export type StarSessionMutationError = ErrorType<void>
+    export type StarSessionMutationVariables = {id: number}
+
+    /**
+ * @summary Star an owned session, idempotently
+ */
+export const useStarSession = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof starSession>>, TError,StarSessionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof starSession>>,
+        TError,
+        StarSessionMutationVariables,
+        TContext
+      > => {
+      return useMutation(getStarSessionMutationOptions(options));
+    }
+
+export const getUnstarSessionUrl = (id: number,) => {
+
+
+
+
+  return `/api/sessions/${id}/star`
+}
+
+/**
+ * @summary Unstar an owned session, idempotently
+ */
+export const unstarSession = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getUnstarSessionUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getUnstarSessionMutationKey = () => ['unstarSession'] as const;
+
+export const getUnstarSessionMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof unstarSession>>, TError,UnstarSessionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof unstarSession>>, TError,UnstarSessionMutationVariables, TContext> => {
+
+const mutationKey = getUnstarSessionMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof unstarSession>>, UnstarSessionMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  unstarSession(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UnstarSessionMutationResult = NonNullable<Awaited<ReturnType<typeof unstarSession>>>
+
+    export type UnstarSessionMutationError = ErrorType<void>
+    export type UnstarSessionMutationVariables = {id: number}
+
+    /**
+ * @summary Unstar an owned session, idempotently
+ */
+export const useUnstarSession = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof unstarSession>>, TError,UnstarSessionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof unstarSession>>,
+        TError,
+        UnstarSessionMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUnstarSessionMutationOptions(options));
     }
 
 export const getGetSessionUrl = (id: number,) => {

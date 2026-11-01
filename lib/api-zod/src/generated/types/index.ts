@@ -11,6 +11,7 @@ export * from './getQuestionTypes401';
 export * from './groupedQuestionTypes';
 export * from './healthStatus';
 export * from './invalidSessionResponse';
+export * from './listSessionsParams';
 export * from './practiceSession';
 export * from './practiceSessionDetail';
 export * from './practiceSessionKind';

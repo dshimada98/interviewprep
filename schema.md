@@ -1,10 +1,10 @@
-# InterviewPrep database schema — Features 1–4
+# InterviewPrep database schema — Features 1–6
 
 The application's SQL source of truth is
-`artifacts/interviewprep/server/schema.sql`. There are five product tables
+`artifacts/interviewprep/server/schema.sql`. There are six product tables
 (`users`, `question_types`, `practice_sessions`, `case_sections`, and
-`section_scores`) plus the existing technical `login_sessions` table used for
-authentication. No story or star tables exist, and `practice_sessions` has no
+`section_scores`, and `stars`) plus the existing technical `login_sessions` table used for
+authentication. No story tables exist, and `practice_sessions` has no
 `story_id` column.
 
 ## users
@@ -81,6 +81,9 @@ that the referenced user still exists before allowing protected API access.
 - A question type has many practice sessions. Each practice session has one
   question type.
 - All users share the question-type reference list.
+- Users and practice sessions connect many-to-many through `stars`.
+  The table supports many user/session pairs; the current API only permits
+  starring a session the logged-in user owns.
 - A login session may refer to a user through its JSON payload; that is an
   application-level relationship, not a database foreign key.
 
@@ -90,6 +93,8 @@ erDiagram
     question_types ||--o{ practice_sessions : categorizes
     practice_sessions ||--o{ section_scores : has
     case_sections ||--o{ section_scores : rates
+    users ||--o{ stars : stars
+    practice_sessions ||--o{ stars : receives
     users {
         integer id PK
         text email UK
@@ -131,6 +136,11 @@ erDiagram
         varchar sid PK
         json sess
         timestamp expire
+    }
+    stars {
+        integer user_id PK,FK
+        integer session_id PK,FK
+        timestamptz created_at
     }
 ```
 
@@ -330,8 +340,8 @@ their replacements. The unique constraint provides a second defense against
 duplicate sections.
 
 An empty or omitted array replaces the card with all N/A. Changing the question
-type to Behavioral always clears its section scores, even if the request still
-contains old scored sections.
+type to Behavioral sends an empty score array and clears its section scores.
+The server rejects nonempty score arrays on Behavioral sessions.
 
 GET `/api/sessions/:id`, POST, and PUT return `section_scores`, sorted by section
 `display_order`. Each scored row includes `id`, `section_id`, `score`, notes,
@@ -347,4 +357,48 @@ notes use the same Save action as the session, not separate requests.
 constraints, parent ownership, invalid scorecards, real rollback after a failed
 child insertion, repeated and concurrent replacement, N/A removal,
 Case-to-Behavioral cleanup, and parent-deletion cascade. The original root
-Vitest data-isolation test continues to run unchanged.
+Vitest data-isolation test continues to run, including the foreign-star assertion.
+
+## stars — shared user/session junction table
+
+| Column | PostgreSQL type | Rules |
+| --- | --- | --- |
+| user_id | integer | Required FK to `users.id`, `ON DELETE CASCADE` |
+| session_id | integer | Required FK to `practice_sessions.id`, `ON DELETE CASCADE` |
+| created_at | timestamptz | Required, defaults to `now()` |
+
+The composite primary key is **`(user_id, session_id)`**. There is no separate
+star ID. The same user/session pair can occur only once; a row's presence means
+starred and its absence means unstarred. A `session_id` index supports cascading
+cleanup when a session is deleted.
+
+**Users and practice sessions connect many-to-many through stars.** It is one
+table for all users, not a dynamically created table per user. Each row carries
+the user's ID, allowing the same constraints, indexes, and queries to apply to
+everyone. The current API additionally restricts stars to sessions the
+authenticated user owns. Identity always comes from the server login session,
+never a request body's `user_id`.
+
+| Method | Endpoint | Behavior |
+| --- | --- | --- |
+| POST | `/api/sessions/:id/star` | Star an owned session; HTTP 204 even if already starred |
+| DELETE | `/api/sessions/:id/star` | Unstar an owned session; HTTP 204 even if already unstarred |
+| GET | `/api/sessions?starred=true` | Only current user's starred sessions, newest `session_date` first |
+
+Both mutations require login and a valid CSRF token. They check and lock the
+owned parent row in a transaction before touching `stars`. Foreign or missing
+sessions return exactly HTTP 404 `{"message":"Session not found"}`.
+`ON CONFLICT DO NOTHING` makes repeated and concurrent star requests safe.
+Deleting a practice session removes its stars; deleting a user removes that
+user's stars automatically.
+
+Session list/detail responses and create/update responses include a boolean
+`starred`. The `/starred` page reuses the practice-log card style. Star toggles
+are optimistic, synchronize list/detail caches, and revert with an inline error
+if saving fails. Star buttons are separate from card links and do not navigate.
+
+`server/stars.test.mjs` covers login, CSRF, ownership and spoofed identity,
+idempotency and concurrent retries, private ordered lists, boolean response
+values, preservation through edits, composite uniqueness, foreign keys, and
+both deletion cascades. `tests/data-isolation.test.ts` also asserts User B
+cannot star User A's session.

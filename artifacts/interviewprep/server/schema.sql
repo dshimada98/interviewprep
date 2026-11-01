@@ -49,3 +49,11 @@ CREATE TABLE IF NOT EXISTS section_scores (
   UNIQUE (session_id, section_id)
 );
 CREATE INDEX IF NOT EXISTS section_scores_section_id_idx ON section_scores (section_id);
+
+CREATE TABLE IF NOT EXISTS stars (
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  session_id INTEGER NOT NULL REFERENCES practice_sessions(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, session_id)
+);
+CREATE INDEX IF NOT EXISTS stars_session_id_idx ON stars (session_id);

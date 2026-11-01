@@ -9,6 +9,7 @@ import type { PracticeSessionKind } from './practiceSessionKind';
 import type { SessionInput } from './sessionInput';
 
 export type PracticeSession = SessionInput & {
+  starred: boolean;
   id: number;
   question_type_name: string;
   kind: PracticeSessionKind;

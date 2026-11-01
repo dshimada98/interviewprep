@@ -85,6 +85,9 @@ describe('practice-session data isolation', () => {
     expect(hidden.body).toEqual({ message: 'Session not found' });
     const missing = await userB.agent.get('/api/sessions/2147483647').expect(404);
     expect(hidden.body).toEqual(missing.body);
+    const forbiddenStar = await userB.agent.post(`/api/sessions/${id}/star`)
+      .set('X-CSRF-Token', userB.csrfToken).expect(404);
+    expect(forbiddenStar.body).toEqual({ message: 'Session not found' });
 
     for (const method of ['put', 'delete'] as const) {
       const rejected = await userB.agent[method](`/api/sessions/${id}`)
