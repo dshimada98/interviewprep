@@ -1,8 +1,8 @@
 # InterviewPrep
 
 InterviewPrep is a consulting case and behavioral interview preparation tracker.
-The workspace setup and Feature 1 custom email/password authentication are implemented.
-No later product features are implemented.
+Features 1 and 2 cover custom email/password authentication and the initial
+practice data model/reference areas. No session CRUD or later features exist.
 
 ## Run & Operate
 
@@ -10,7 +10,7 @@ No later product features are implemented.
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- `pnpm test` — authentication integration tests against PostgreSQL
+- `pnpm test` — authentication, data-model, and production-settings integration tests against PostgreSQL
 - `pnpm --filter @workspace/interviewprep test:browser` — real browser flows against the running product
 - Required env: `DATABASE_URL` and `SESSION_SECRET` (never print values)
 
@@ -25,7 +25,8 @@ No later product features are implemented.
 
 ## Where things live
 
-- `PLAN.md` — full product roadmap; only Feature 1 is currently in build scope.
+- `PLAN.md` — full product roadmap; build only the currently requested feature.
+- `schema.md` — current table definitions, relationships, seeding, and Feature 2 API.
 - `attached_assets/` — original user briefs.
 - `artifacts/interviewprep/` — product React frontend and Express auth backend. `server/app.mjs` exports the app without a listener; `server/index.mjs` starts it.
 - `artifacts/api-server/` — retained unused setup scaffold; it must not intercept the product's `/api` routes.
@@ -62,7 +63,12 @@ and stories must not be built early.
 
 - Artifact services own their workflows and supply PORT and BASE_PATH.
   Do not create replacement workflows or run root-level `pnpm dev`.
-- Only `users` and `login_sessions` exist. Development setup applies `artifacts/interviewprep/server/schema.sql`; never run an empty scaffold schema push that could remove auth tables.
+- The SQL source of truth is `artifacts/interviewprep/server/schema.sql`.
+  Current tables are `users`, `login_sessions`, `question_types`, and
+  `practice_sessions`. Never run the empty scaffold's Drizzle push over them.
+- Startup seeds only missing shared question types in both development and
+  production, after schema provisioning. No startup DDL or production migration
+  hooks. Practice-session CRUD and story links remain out of scope.
 - Every future API router goes below the shared `requireAuth` boundary in the product's `server/app.mjs`. Mutations require its session-bound CSRF token.
 
 ## Pointers

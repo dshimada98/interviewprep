@@ -3,11 +3,11 @@ name: Feature scope and ownership
 description: User constraints for incremental InterviewPrep development and authentication scope.
 ---
 
-Build InterviewPrep one feature at a time. The current requested scope is Feature 1, sign up and login; later features are to be built separately, each on its own branch.
+Build InterviewPrep one feature at a time. Later features are to be built separately, each on its own branch.
 
 **Why:** The user explicitly limited the initial build and said they will build the remaining features one at a time later.
 
-**How to apply:** Do not add interview practice sessions, scorecards, stars, dashboards, stories, or other later features without a new request.
+**How to apply:** Implement only the feature explicitly requested in the current user brief; do not infer permission to build later features from the full roadmap.
 
 Use custom in-app email/password authentication, not Replit Auth or third-party login. A separate PostgreSQL login-session storage table is approved as an exception to the original users-only table restriction.
 

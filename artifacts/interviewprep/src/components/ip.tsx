@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, Redirect, useLocation } from 'wouter';
 import { Menu, X, LogOut, AlertCircle, Loader2 } from 'lucide-react';
 import { useAuth, messages } from '@/auth';
+import { PracticeAreas } from './practice-areas';
 
 const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -232,6 +233,7 @@ export function HomePage() {
           <p className="text-sm text-muted-foreground">Signed in as</p>
           <p className="mt-1 text-lg font-semibold break-all">{user?.email}</p>
         </div>
+        <PracticeAreas />
       </main>
     </div>
   );
