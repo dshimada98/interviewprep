@@ -1,0 +1,23 @@
+kind = "web"
+previewPath = "/"
+title = "InterviewPrep"
+description = "Email/password authentication and a protected welcome page."
+version = "1.0.0"
+id = "artifacts/interviewprep"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 18177
+
+[services.development]
+run = "pnpm --filter @workspace/interviewprep run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/interviewprep", "run", "build" ]
+run = [ "pnpm", "--filter", "@workspace/interviewprep", "run", "start" ]
+
+[services.env]
+PORT = "18177"
+BASE_PATH = "/"

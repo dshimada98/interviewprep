@@ -1,0 +1,2 @@
+- [Feature scope and ownership](feature-scope.md) — build InterviewPrep one feature at a time; custom auth, approved session-table exception, and user-managed Git.
+- [Browser testing on Nix](browser-environment.md) — use system Chromium; downloaded browser bundles lack expected shared libraries in this environment.

@@ -1,0 +1,5 @@
+# Keep the incoming workspace exclusions and generated caches out of deployments.
+.local
+.cache/
+node_modules/
+/generated-artifacts/
