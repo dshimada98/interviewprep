@@ -118,6 +118,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'signup' }) {
     if (!emailRe.test(em)) return setEmailErr(messages.email);
     if (signup && password.length < 8) return setPwErr(messages.short);
     if (signup && new TextEncoder().encode(password).length > 72) return setFormErr('Password must be no more than 72 bytes.');
+    if (signup && !/[\p{P}\p{S}]/u.test(password)) return setPwErr(messages.special);
     if (signup && password !== confirm) return setPwErr(messages.mismatch);
     setBusy(true);
     try {
@@ -154,8 +155,8 @@ export function AuthPage({ mode }: { mode: 'login' | 'signup' }) {
               {formErr && <div className="rounded-lg bg-white border-l-4 p-3" style={{ borderColor: 'var(--score-1)' }}><Inline>{formErr}</Inline></div>}
               <Field id="email" label="Email" type="email" auto="email" value={email} onChange={setEmail} error={emailErr} />
               <Field id="password" label="Password" type="password" auto={signup ? 'new-password' : 'current-password'}
-                value={password} onChange={setPassword} error={!signup ? undefined : pwErr && pwErr === messages.short ? pwErr : undefined}
-                hint={signup ? 'At least 8 characters.' : undefined} />
+                value={password} onChange={setPassword} error={signup && pwErr && pwErr !== messages.mismatch ? pwErr : undefined}
+                hint={signup ? 'At least 8 characters, including a special character (e.g. !, @, #).' : undefined} />
               {signup && <Field id="confirmPassword" label="Confirm password" type="password" auto="new-password"
                 value={confirm} onChange={setConfirm} error={pwErr === messages.mismatch ? pwErr : undefined} />}
               <button type="submit" disabled={busy}

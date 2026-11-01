@@ -52,6 +52,8 @@ and stories must not be built early.
 - The user manages Git. Do not change branches, merge, or push to main.
 - Use in-app email/password authentication with bcrypt and express-session,
   not Replit Auth or third-party login.
+- New signup passwords require at least eight characters and one punctuation
+  mark or symbol; spaces alone do not count. Preserve login for existing accounts.
 - For Feature 1, create only users and the separately approved PostgreSQL
   login-session storage table. Authentication sessions are not practice sessions.
 - Preserve the user's PLAN.md and README.md unless specifically asked to edit them. Feature 1 delivery documentation is in `AUTHENTICATION.md`.

@@ -5,6 +5,7 @@ export const messages = {
   blank: 'Please fill in all fields.',
   mismatch: "Passwords don't match.",
   short: 'Password must be at least 8 characters.',
+  special: 'Password must include at least one special character (for example, !, @, or #).',
   email: 'Please enter a valid email address.',
 };
 let csrfToken = '';

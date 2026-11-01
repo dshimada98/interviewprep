@@ -39,8 +39,28 @@ test('real PostgreSQL authentication lifecycle and validation', async t => {
       await post('login', { email, password: '' }, 400, 'Please fill in all fields.');
       await post('signup', { email: 'invalid', password, confirmPassword: password }, 400, 'Please enter a valid email address.');
       await post('signup', { email, password: 'short', confirmPassword: 'short' }, 400, 'Password must be at least 8 characters.');
+      for (const candidate of ['Password123', 'Only Letters', '密码测试一二三四']) {
+        await post('signup', { email, password: candidate, confirmPassword: candidate }, 400,
+          'Password must include at least one special character (for example, !, @, or #).');
+      }
+      assert.equal((await pool.query('SELECT id FROM users WHERE email=$1', [email])).rowCount, 0);
       await post('signup', { email, password, confirmPassword: 'different' }, 400, "Passwords don't match.");
       await post('signup', { email, password: 'a'.repeat(73), confirmPassword: 'a'.repeat(73) }, 400, 'Password must be no more than 72 bytes.');
+    });
+    await t.test('existing accounts without special characters can still log in', async () => {
+      const legacyPassword = 'LegacyPassword123';
+      const legacyEmail = `legacy-${email}`;
+      const hash = await bcrypt.hash(legacyPassword, 12);
+      const legacy = (await pool.query(
+        'INSERT INTO users (email, password_hash) VALUES ($1, $2) RETURNING id', [legacyEmail, hash],
+      )).rows[0];
+      ids.push(legacy.id);
+      const legacyClient = await client();
+      const result = await legacyClient.agent.post('/api/auth/login')
+        .set('X-CSRF-Token', legacyClient.token)
+        .send({ email: legacyEmail, password: legacyPassword }).expect(200);
+      tokens.push(result.body.csrfToken);
+      assert.equal(result.body.user.id, legacy.id);
     });
     let signup;
     await t.test('signup normalizes email, hashes password, rotates session and returns safe fields', async () => {

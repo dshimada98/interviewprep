@@ -65,6 +65,7 @@ const errors = {
   blank: 'Please fill in all fields.',
   invalidEmail: 'Please enter a valid email address.',
   short: 'Password must be at least 8 characters.',
+  special: 'Password must include at least one special character (for example, !, @, or #).',
   mismatch: "Passwords don't match.",
   duplicate: 'An account with this email already exists. Try logging in.',
   credentials: 'Email or password is incorrect.',
@@ -77,6 +78,7 @@ function validate(body, signup) {
   if (password.length < 8) return signup ? errors.short : errors.credentials;
   // bcrypt only considers the first 72 bytes: reject rather than silently truncate.
   if (Buffer.byteLength(password, 'utf8') > 72) return signup ? 'Password must be no more than 72 bytes.' : errors.credentials;
+  if (signup && !/[\p{P}\p{S}]/u.test(password)) return errors.special;
   if (signup && password !== confirmPassword) return errors.mismatch;
 }
 async function establishSession(req, res, user, status = 200) {

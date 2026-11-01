@@ -67,6 +67,14 @@ Only `/api/auth/status`, `/api/auth/signup` and `/api/auth/login` are public. Al
 13. Repeat at approximately 375px and laptop width. Check no horizontal scrolling, 44px minimum inputs/buttons, keyboard focus and mobile logout access.
 14. In Replit's development Database pane, verify there are only `users` and `login_sessions`. Verify lowercase emails and bcrypt hashes, not submitted passwords. Do not copy passwords or hashes into chat.
 
+New accounts require at least eight characters and at least one special character
+(punctuation or a symbol, such as `!`, `@`, `#`, or `-`). Spaces alone do not
+satisfy the special-character rule. The signup form and server both enforce it
+and show “Password must include at least one special character (for example, !, @, or #).”
+Existing accounts without special characters can still log in with their current
+passwords. To test the new rule, try signing up with a letters-and-digits-only
+password, then add a special character and submit again.
+
 Bcrypt ignores bytes after 72; the app rejects passwords over 72 UTF-8 bytes instead of silently treating different passwords as equivalent.
 
 ## Automated checks
