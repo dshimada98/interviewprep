@@ -55,6 +55,142 @@ afterAll(async () => {
 });
 
 describe('practice-session data isolation', () => {
+  it('isolates checklist reads, writes, clears and note sources between users', async () => {
+    const a = await signUp(), b = await signUp();
+    const add = (u: typeof a, data: object) => u.agent.post('/api/checklist').set('X-CSRF-Token', u.csrfToken).send(data);
+    const own = (await add(a, { text: 'Slow down and clarify', user_id: b.id }).expect(200)).body;
+    expect(own.user_id).toBe(a.id);
+    expect((await b.agent.get('/api/checklist').expect(200)).body)
+      .toEqual({ open: [], completed: [], completed_count: 0, note_keys: [] });
+    const types = (await a.agent.get('/api/question-types').expect(200)).body;
+    const section = (await a.agent.get('/api/case-sections').expect(200)).body[0].id;
+    const session = (await a.agent.post('/api/sessions').set('X-CSRF-Token', a.csrfToken).send({
+      question_type_id: types.case[0].id, session_date: '2025-10-28', prompt: 'Coffee chain profitability',
+      format: 'solo', overall_score: 3, to_improve: 'Summarize the recommendation',
+      section_scores: [{ section_id: section, score: 2, to_improve: 'Clarify the objective first' }],
+    }).expect(201)).body;
+    for (const method of ['patch', 'delete'] as const) {
+      const r = await b.agent[method](`/api/checklist/${own.id}`).set('X-CSRF-Token', b.csrfToken)
+        .send(method === 'patch' ? { done: true } : {}).expect(404);
+      expect(r.body.message).toBe('Item not found');
+    }
+    for (const section_id of [null, section]) {
+      const r = await add(b, { source_session_id: session.id, section_id, text: 'forged note' }).expect(404);
+      expect(r.body.message).toBe('Item not found');
+    }
+    await a.agent.patch(`/api/checklist/${own.id}`).set('X-CSRF-Token', a.csrfToken).send({ done: true }).expect(200);
+    const theirs = (await add(b, { text: 'Other account item' }).expect(200)).body;
+    await b.agent.patch(`/api/checklist/${theirs.id}`).set('X-CSRF-Token', b.csrfToken).send({ done: true }).expect(200);
+    await b.agent.delete('/api/checklist/completed').set('X-CSRF-Token', b.csrfToken).expect(204);
+    expect((await a.agent.get('/api/checklist').expect(200)).body.completed.map((i: { id: number }) => i.id)).toEqual([own.id]);
+    expect((await b.agent.get('/api/checklist').expect(200)).body.completed_count).toBe(0);
+    await request(app).get('/api/checklist').expect(401);
+    await request(app).post('/api/checklist').send({ text: 'Anonymous' }).expect(401);
+    await a.agent.post('/api/checklist').send({ text: 'No CSRF' }).expect(403);
+    expect((await a.agent.get('/api/checklist').expect(200)).body.open).toEqual([]);
+  });
+
+  it('copies notes once per session and section, preserves edits/completion, and survives source deletion', async () => {
+    const a = await signUp();
+    const types = (await a.agent.get('/api/question-types').expect(200)).body;
+    const sections = (await a.agent.get('/api/case-sections').expect(200)).body;
+    const session = (await a.agent.post('/api/sessions').set('X-CSRF-Token', a.csrfToken).send({
+      question_type_id: types.case[0].id, session_date: '2025-10-28', prompt: 'Coffee chain profitability',
+      format: 'solo', overall_score: 3, to_improve: '  Summarize the recommendation  ',
+      section_scores: sections.slice(0, 2).map((s: { id: number }, i: number) =>
+        ({ section_id: s.id, score: 2, to_improve: i ? 'Check the units' : 'Clarify the objective' })),
+    }).expect(201)).body;
+    const note = (section_id: number | null) => a.agent.post('/api/checklist').set('X-CSRF-Token', a.csrfToken)
+      .send({ source_session_id: session.id, section_id, text: 'Never trust supplied note text', from_note: false });
+    const [one, two] = await Promise.all([note(null).expect(200), note(null).expect(200)]);
+    expect(one.body.id).toBe(two.body.id);
+    expect(one.body.text).toBe('Summarize the recommendation');
+    expect(one.body.from_note).toBe(true);
+    expect(one.body.source_session_date).toBe('2025-10-28');
+    expect(one.body.source_session_prompt).toBe('Coffee chain profitability');
+    const section = (await note(sections[0].id).expect(200)).body;
+    expect(section.text).toBe('Clarify the objective');
+    expect(section.section_name).toBe(sections[0].name);
+    expect((await note(sections[1].id).expect(200)).body.id).not.toBe(section.id);
+    const edited = (await a.agent.patch(`/api/checklist/${one.body.id}`).set('X-CSRF-Token', a.csrfToken)
+      .send({ text: 'Edited action', done: true }).expect(200)).body;
+    expect(edited.done_at).toBeTruthy();
+    expect((await note(null).expect(200)).body).toEqual(edited);
+    const reopened = (await a.agent.patch(`/api/checklist/${one.body.id}`).set('X-CSRF-Token', a.csrfToken)
+      .send({ done: false }).expect(200)).body;
+    expect(reopened.done_at).toBeNull();
+    expect(reopened.text).toBe('Edited action');
+    // The source note may disappear; adding again still returns the same item.
+    await pool.query('UPDATE practice_sessions SET to_improve=NULL WHERE id=$1 AND user_id=$2', [session.id, a.id]);
+    expect((await note(null).expect(200)).body.id).toBe(one.body.id);
+    await expect(pool.query(`INSERT INTO checklist_items(user_id,text,source_session_id)
+      VALUES ($1,'Duplicate overall',$2)`, [a.id, session.id])).rejects.toMatchObject({ code: '23505' });
+    await expect(pool.query(`INSERT INTO checklist_items(user_id,text,source_session_id,section_id)
+      VALUES ($1,'Duplicate section',$2,$3)`, [a.id, session.id, sections[0].id])).rejects.toMatchObject({ code: '23505' });
+    const list = (await a.agent.get('/api/checklist').expect(200)).body;
+    expect(list.note_keys).toHaveLength(3);
+    await a.agent.delete(`/api/sessions/${session.id}`).set('X-CSRF-Token', a.csrfToken).expect(204);
+    const kept = (await a.agent.get('/api/checklist').expect(200)).body;
+    expect(kept.open).toHaveLength(3);
+    expect(kept.note_keys).toEqual([]);
+    expect(kept.open.every((i: { source_session_id: number | null; from_note: boolean; source_session_prompt: string | null }) =>
+      i.source_session_id === null && i.from_note && i.source_session_prompt === null)).toBe(true);
+  });
+
+  it('validates checklist text and sections and limits completed results without limiting counts or membership', async () => {
+    const a = await signUp();
+    const add = (data: object) => a.agent.post('/api/checklist').set('X-CSRF-Token', a.csrfToken).send(data);
+    for (const text of ['', ' \n\t ']) {
+      expect((await add({ text }).expect(400)).body.errors.text).toBe('Please write what you want to work on.');
+    }
+    expect((await add({ text: 'x'.repeat(201) }).expect(400)).body.errors.text).toBe('Please keep it under 200 characters.');
+    await add({ text: 'A valid item', section_id: 2147483647 }).expect(400);
+    await add({ source_session_id: 2147483647 }).expect(404);
+    const first = (await add({ text: 'x'.repeat(200), done: true }).expect(200)).body;
+    expect(first.text).toHaveLength(200);
+    expect(first.done).toBe(false);
+    expect(first.done_at).toBeNull();
+    await a.agent.patch(`/api/checklist/${first.id}`).set('X-CSRF-Token', a.csrfToken)
+      .send({ text: 'x'.repeat(201) }).expect(400);
+    await a.agent.patch(`/api/checklist/${first.id}`).set('X-CSRF-Token', a.csrfToken).send({ done: 'true' }).expect(400);
+    const types = (await a.agent.get('/api/question-types').expect(200)).body;
+    const sections = (await a.agent.get('/api/case-sections').expect(200)).body;
+    const source = (await a.agent.post('/api/sessions').set('X-CSRF-Token', a.csrfToken).send({
+      question_type_id: types.case[0].id, session_date: '2025-10-28', prompt: 'Checklist validation',
+      format: 'solo', overall_score: 3, to_improve: 'A completed note',
+    }).expect(201)).body;
+    const oldNote = (await add({ source_session_id: source.id }).expect(200)).body;
+    await a.agent.patch(`/api/checklist/${oldNote.id}`).set('X-CSRF-Token', a.csrfToken).send({ done: true }).expect(200);
+    expect((await add({ source_session_id: source.id, section_id: sections[0].id }).expect(400)).body.errors.text)
+      .toBe('Please write what you want to work on.');
+    await pool.query('UPDATE practice_sessions SET to_improve=$1 WHERE id=$2 AND user_id=$3',
+      ['x'.repeat(201), source.id, a.id]);
+    // No truncation: a different, over-limit source note is rejected explicitly.
+    await a.agent.delete(`/api/checklist/${oldNote.id}`).set('X-CSRF-Token', a.csrfToken).expect(204);
+    expect((await add({ source_session_id: source.id }).expect(400)).body.errors.text)
+      .toBe('Please keep it under 200 characters.');
+    await pool.query('UPDATE practice_sessions SET to_improve=$1 WHERE id=$2 AND user_id=$3',
+      ['A completed note', source.id, a.id]);
+    const restoredNote = (await add({ source_session_id: source.id }).expect(200)).body;
+    await a.agent.patch(`/api/checklist/${restoredNote.id}`).set('X-CSRF-Token', a.csrfToken).send({ done: true }).expect(200);
+    for (let i = 0; i < 12; i++) {
+      const created = (await add({ text: `Completed ${i}` }).expect(200)).body;
+      await a.agent.patch(`/api/checklist/${created.id}`).set('X-CSRF-Token', a.csrfToken).send({ done: true }).expect(200);
+    }
+    const list = (await a.agent.get('/api/checklist').expect(200)).body;
+    expect(list.completed_count).toBe(13);
+    expect(list.completed).toHaveLength(10);
+    expect(list.completed[0].text).toBe('Completed 11');
+    expect(list.completed[9].text).toBe('Completed 2');
+    expect(list.note_keys).toContainEqual({ source_session_id: source.id, section_id: null });
+    expect(list.completed.some((i: { id: number }) => i.id === restoredNote.id)).toBe(false);
+    expect(list.open.map((i: { id: number }) => i.id)).toEqual([first.id]);
+    await a.agent.delete('/api/checklist/completed').set('X-CSRF-Token', a.csrfToken).expect(204);
+    expect((await a.agent.get('/api/checklist').expect(200)).body.completed_count).toBe(0);
+    await a.agent.delete(`/api/checklist/${first.id}`).set('X-CSRF-Token', a.csrfToken).expect(204);
+    await a.agent.delete(`/api/checklist/${first.id}`).set('X-CSRF-Token', a.csrfToken).expect(404);
+  });
+
   it('tracks publication-year editions separately without changing unyearred books or privacy', async () => {
     const a = await signUp(), b = await signUp();
     const before = (await a.agent.get('/api/case-books').expect(200)).body.books;

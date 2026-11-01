@@ -147,6 +147,55 @@ export interface DashboardSummary {
   heatmap: DashboardHeatmapSession[];
 }
 
+export interface ChecklistInput {
+  /** @maxLength 200 */
+  text?: string;
+  /** @nullable */
+  section_id?: number | null;
+  /** @nullable */
+  source_session_id?: number | null;
+}
+
+export interface ChecklistUpdate {
+  /** @maxLength 200 */
+  text?: string;
+  done?: boolean;
+}
+
+export interface ChecklistNoteKey {
+  source_session_id: number;
+  /** @nullable */
+  section_id: number | null;
+}
+
+export interface ChecklistItem {
+  id: number;
+  user_id: number;
+  text: string;
+  /** @nullable */
+  section_id: number | null;
+  /** @nullable */
+  source_session_id: number | null;
+  from_note: boolean;
+  done: boolean;
+  created_at: string;
+  /** @nullable */
+  done_at: string | null;
+  /** @nullable */
+  section_name: string | null;
+  /** @nullable */
+  source_session_date: string | null;
+  /** @nullable */
+  source_session_prompt: string | null;
+}
+
+export interface ChecklistList {
+  open: ChecklistItem[];
+  completed: ChecklistItem[];
+  completed_count: number;
+  note_keys: ChecklistNoteKey[];
+}
+
 export interface CaseBookInput {
   /**
      * @minimum 1000

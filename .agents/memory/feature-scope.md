@@ -50,3 +50,13 @@ year on a single shared identity. Unknown years remain blank.
 
 **How to apply:** Keep edition-specific sessions, filters, dashboard counts, and
 defaults distinct; do not merge books merely because their titles match.
+
+Copying a session note into the checklist must not silently truncate or summarize
+it. An over-limit note should give a friendly error and let the user write a
+shorter manual action instead.
+
+**Why:** Session notes allow much longer text than checklist items; the brief
+asks to copy the note, not replace it with an abbreviated interpretation.
+
+**How to apply:** Keep the original note unchanged and make any shortening an
+explicit user action.

@@ -20,6 +20,7 @@ import { CaseBookSelect, NO_BOOK, useCaseBooks } from './case-book-select';
 import { caseBookLabel } from './case-book-label';
 import { ClearFilters, FinderControls, useSessionFinder } from './session-finder';
 import { STAR_ERROR, StarButton, useStarToggle, type StarToggle } from './session-stars';
+import { AddNoteButton } from './checklist';
 import { ScorecardEditor, ScorecardView, draftsFrom, draftsToInput, useCaseSections, type ScoreDrafts } from './scorecard';
 
 const FORMATS = [
@@ -360,13 +361,13 @@ export function SessionDetailPage({ rawId }: { rawId?: string }) {
             ))}
           </dl>
 
-          {s.kind === 'case' && <ScorecardView scores={s.section_scores ?? []} />}
+          {s.kind === 'case' && <ScorecardView scores={s.section_scores ?? []} sessionId={s.id} />}
 
           <div className="ip-rise mt-6 grid gap-4 md:grid-cols-2" style={{ animationDelay: '120ms' }}>
             {([['What went well', s.went_well, 'var(--green)'], ['To improve', s.to_improve, 'var(--score-3)']] as const).map(([k, v, c]) => (
               <section key={k} className="rounded-xl border bg-white p-5 sm:p-6" style={{ borderTop: `4px solid ${c}` }}>
                 <h2 className="text-base font-bold">{k}</h2>
-                {v ? <p className="mt-3 text-sm leading-relaxed whitespace-pre-wrap break-words">{v}</p>
+                {v ? <><p className="mt-3 text-sm leading-relaxed whitespace-pre-wrap break-words">{v}</p>{k === 'To improve' && <AddNoteButton sessionId={s.id} sectionId={null} label="overall to improve note" />}</>
                   : <p className="mt-3 text-sm text-muted-foreground">Nothing noted.</p>}
               </section>
             ))}
