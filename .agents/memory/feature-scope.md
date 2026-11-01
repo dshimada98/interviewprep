@@ -20,3 +20,9 @@ Do not change Git branches, merge, or push to main.
 **Why:** The user said, “I manage Git myself.”
 
 **How to apply:** Leave those Git operations to the user during implementation.
+
+A brand-new account's empty dashboard is a critical user path.
+
+**Why:** The user explicitly plans to sign up live during a demo and called out avoiding broken charts or “NaN” with no sessions.
+
+**How to apply:** Check zero-session accounts alongside populated accounts when changing the dashboard or post-login landing page.

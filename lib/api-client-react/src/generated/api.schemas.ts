@@ -5,6 +5,53 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+/**
+ * @nullable
+ */
+export type DashboardWeakestType = {
+  name: string;
+  average_score: number;
+} | null;
+
+export interface DashboardCaseType {
+  id: number;
+  name: string;
+  count: number;
+}
+
+export interface DashboardSectionAverage {
+  id: number;
+  name: string;
+  display_order: number;
+  /** @nullable */
+  average_score: number | null;
+  scored_count: number;
+}
+
+export interface DashboardSectionScore {
+  section_id: number;
+  /** @nullable */
+  score: number | null;
+}
+
+export interface DashboardHeatmapSession {
+  id: number;
+  session_date: string;
+  prompt: string;
+  sections: DashboardSectionScore[];
+}
+
+export interface DashboardSummary {
+  total_cases: number;
+  /** @nullable */
+  average_case_score: number | null;
+  weakest_case_type: DashboardWeakestType | null;
+  behavioral_sessions: number;
+  cases_by_type: DashboardCaseType[];
+  section_averages: DashboardSectionAverage[];
+  heatmap: DashboardHeatmapSession[];
+}
+
 export interface SectionScoreInput {
   /**
      * @minimum 1

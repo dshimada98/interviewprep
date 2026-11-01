@@ -4,9 +4,10 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
-import { Route, Switch, useLocation, Router as WouterRouter } from 'wouter';
+import { Redirect, Route, Switch, useLocation, Router as WouterRouter } from 'wouter';
 import { AuthProvider } from '@/auth';
-import { AppHeader, AuthPage, GuestOnly, HomePage, Protected } from '@/components/ip';
+import { AppHeader, AuthPage, GuestOnly, Protected } from '@/components/ip';
+import { DashboardPage } from '@/components/dashboard';
 import { EditSessionPage, NewSessionPage, SessionCacheGuard, SessionDetailPage, SessionsListPage, StarredPage } from '@/components/sessions';
 
 const queryClient = new QueryClient();
@@ -15,7 +16,8 @@ function Router() {
   return (
     <RoutedErrorBoundary>
       <Switch>
-        <Route path="/"><Protected><HomePage /></Protected></Route>
+        <Route path="/"><Redirect to="/dashboard" /></Route>
+        <Route path="/dashboard"><Protected><DashboardPage /></Protected></Route>
         <Route path="/sessions"><Protected><SessionsListPage /></Protected></Route>
         <Route path="/starred"><Protected><StarredPage /></Protected></Route>
         <Route path="/sessions/new"><Protected><NewSessionPage /></Protected></Route>

@@ -11,6 +11,20 @@ tags:
   - name: health
     description: Health operations
 paths:
+  /dashboard:
+    get:
+      operationId: getDashboard
+      summary: Private practice dashboard computed from owned sessions
+      security: [{sessionCookie: []}]
+      responses:
+        "200":
+          description: Owned practice statistics, section averages, and recent-case heatmap
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+        "401":
+          description: Login required
   /case-sections:
     get:
       operationId: getCaseSections
@@ -212,6 +226,85 @@ components:
       in: cookie
       name: interviewprep.sid
   schemas:
+    DashboardSummary:
+      type: object
+      required: [total_cases, average_case_score, weakest_case_type, behavioral_sessions, cases_by_type, section_averages, heatmap]
+      properties:
+        total_cases:
+          type: integer
+        average_case_score:
+          type: [number, "null"]
+        weakest_case_type:
+          $ref: "#/components/schemas/DashboardWeakestType"
+        behavioral_sessions:
+          type: integer
+        cases_by_type:
+          type: array
+          items:
+            $ref: "#/components/schemas/DashboardCaseType"
+        section_averages:
+          type: array
+          items:
+            $ref: "#/components/schemas/DashboardSectionAverage"
+        heatmap:
+          type: array
+          items:
+            $ref: "#/components/schemas/DashboardHeatmapSession"
+    DashboardWeakestType:
+      type: [object, "null"]
+      required: [name, average_score]
+      properties:
+        name:
+          type: string
+        average_score:
+          type: number
+    DashboardCaseType:
+      type: object
+      required: [id, name, count]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        count:
+          type: integer
+    DashboardSectionAverage:
+      type: object
+      required: [id, name, display_order, average_score, scored_count]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        display_order:
+          type: integer
+        average_score:
+          type: [number, "null"]
+        scored_count:
+          type: integer
+    DashboardHeatmapSession:
+      type: object
+      required: [id, session_date, prompt, sections]
+      properties:
+        id:
+          type: integer
+        session_date:
+          type: string
+          format: date
+        prompt:
+          type: string
+        sections:
+          type: array
+          items:
+            $ref: "#/components/schemas/DashboardSectionScore"
+    DashboardSectionScore:
+      type: object
+      required: [section_id, score]
+      properties:
+        section_id:
+          type: integer
+        score:
+          type: [integer, "null"]
     SessionList:
       type: object
       required: [sessions, total]

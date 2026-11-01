@@ -7,6 +7,12 @@
  */
 
 export * from './caseSection';
+export * from './dashboardCaseType';
+export * from './dashboardHeatmapSession';
+export * from './dashboardSectionAverage';
+export * from './dashboardSectionScore';
+export * from './dashboardSummary';
+export * from './dashboardWeakestType';
 export * from './getQuestionTypes401';
 export * from './groupedQuestionTypes';
 export * from './healthStatus';

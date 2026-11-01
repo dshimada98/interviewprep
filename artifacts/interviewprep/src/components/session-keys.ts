@@ -1,5 +1,5 @@
 import type { Query, QueryClient } from '@tanstack/react-query';
-import { getGetSessionQueryKey, getListSessionsQueryKey, type ListSessionsParams, type SessionList } from '@workspace/api-client-react';
+import { getGetDashboardQueryKey, getGetSessionQueryKey, getListSessionsQueryKey, type ListSessionsParams, type SessionList } from '@workspace/api-client-react';
 
 export const statusOf = (e: unknown) => (e && typeof e === 'object' && 'status' in e ? (e as { status: number }).status : undefined);
 
@@ -21,7 +21,12 @@ export const isListQuery = (uid?: number) => (q: Query) => {
 };
 export const paramsOfKey = (k: readonly unknown[]): ListSessionsParams => (k.length === 3 ? (k[1] as ListSessionsParams) : {});
 
-export const invalidateLists = (qc: QueryClient, uid?: number) => qc.invalidateQueries({ predicate: isListQuery(uid) });
+export const dashboardKey = (uid?: number) => [...getGetDashboardQueryKey(), uid] as const;
+/** Session create/edit/delete changes list results and dashboard aggregates. Star toggles do not touch the dashboard. */
+export const invalidateLists = (qc: QueryClient, uid?: number, opts: { dashboard?: boolean } = {}) => Promise.all([
+  qc.invalidateQueries({ predicate: isListQuery(uid) }),
+  opts.dashboard === false ? undefined : qc.invalidateQueries({ queryKey: dashboardKey(uid), exact: true }),
+]);
 
 /** Remove a deleted session from every cached envelope for the user. */
 export function removeFromLists(qc: QueryClient, uid: number | undefined, id: number) {
