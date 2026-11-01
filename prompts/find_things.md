@@ -1,36 +1,42 @@
 # Initial Prompt
-Features 1-5 are done and merged. Now build ONLY Feature 6 (stars) from PLAN.md.
+Features 1-6 are done and merged. Now build ONLY Feature 7 (find things: search, filter, sort) from PLAN.md, on the Sessions list page.
 
-NEW TABLE: stars (one table for all users, a junction table meaning "this user starred this session")
-- user_id (required, references users.id, deleted automatically when the user is deleted)
-- session_id (required, references practice_sessions.id, deleted automatically when the session is deleted)
-- created_at (timestamp, defaults to now)
-- Composite primary key on (user_id, session_id), so the same user can never star the same session twice.
+SERVER (do the searching, filtering, and sorting in the database query, not in the browser)
+Extend GET /api/sessions with optional query parameters:
+- q: keyword search, case-insensitive, matching the session prompt, the overall "went well" and "to improve" notes, AND the section-level notes. A session should appear only once even if several notes match.
+- kind: "case" or "behavioral"
+- type: a question_type_id
+- score: "low" (1-2), "mid" (3), or "high" (4-5), based on overall_score
+- sort: "newest" (default), "oldest", "highest", "lowest". Break ties by newest session_date.
+- starred: keep the existing starred=true behavior working.
+Rules:
+- Every result must still be filtered to the logged-in user's sessions only.
+- Use parameterized queries. Typing characters like ' or % in the search must not break anything.
+- Ignore invalid parameter values instead of erroring.
+- Also return the user's total session count, so the page can show "Showing X of Y sessions".
 
-API (login required; same security rules as Feature 3)
-- POST /api/sessions/:id/star: star a session. Calling it twice is harmless (no error, no duplicate row).
-- DELETE /api/sessions/:id/star: unstar a session. Calling it when it isn't starred is harmless.
-- The session must belong to the logged-in user, otherwise return 404 "Session not found". The user_id always comes from the logged-in user's server session.
-- GET /api/sessions and GET /api/sessions/:id: include "starred": true/false for each session.
-- GET /api/sessions?starred=true: only the logged-in user's starred sessions, newest session_date first.
+UI ON THE SESSIONS PAGE
+- A search box at the top: "Search prompts and notes". Results update as I type, waiting about 300ms after I stop typing.
+- Filters:
+  - Kind: All / Case / Behavioral, as tap buttons.
+  - Question type dropdown, limited to the selected kind.
+  - Score: Any / 1-2 / 3 / 4-5, as tap buttons using the score colors.
+- A sort dropdown: Newest first, Oldest first, Highest score, Lowest score.
+- "Showing X of Y sessions" above the results.
+- A "Clear filters" button, shown whenever any search, filter, or non-default sort is active.
+- No results: "No sessions match your search." with a Clear filters button.
+- Keep the current search, filters, and sort in the page URL, so refreshing the page or pressing Back keeps them.
+- On phones: the search box is full width, and the filters collapse behind a "Filters" button showing how many are active, e.g. "Filters (2)". On laptops, show the filters in one row above the list. Nothing scrolls sideways.
 
-UI
-- A star button on every session in the list and on the detail page: an outline star when not starred, a filled navy (#1F2A44) star when starred. Tapping toggles it immediately, and if the server call fails, revert it and show a short error.
-- Accessible labels: "Star this session" / "Unstar this session". Tap target at least 44px. Tapping the star in the list must NOT open the session's detail page.
-- Add "Starred" to the header navigation. The Starred page (/starred) has the title "Starred" and a subtitle "Your redo list", and lists starred sessions in the same card style as the sessions list.
-- Empty state: "No starred sessions yet. Star a session you want to redo."
-- Must look good on a phone and a laptop.
-
-DOCUMENTATION AND TESTS
-- Update schema.md with the stars table and its relationships ("users and practice sessions connect many-to-many through stars").
-- Add one assertion to tests/data-isolation.test.ts: User B trying to star User A's session gets 404.
+TESTS
+- Add one assertion to tests/data-isolation.test.ts: User B searching for "Coffee chain" (the words in User A's session prompt) gets zero results.
 - Run npm test and confirm everything passes.
 
 DO NOT
-- Build search, filters, sorting, dashboard, or stories.
+- Build the dashboard or stories.
 - Change git branches, merge, or push. I manage Git myself.
 
 WHEN YOU'RE DONE
-Give me: (1) the files you created or changed, (2) a plain-English explanation of how the stars table works and why it's one table for everyone rather than one per user, and (3) the npm test result.
+Give me: (1) the files you created or changed, (2) a plain-English explanation of how a search goes from the search box to the database and back, and why it's done in the database rather than the browser, and (3) the npm test result.
 
 # Follow up prompt
