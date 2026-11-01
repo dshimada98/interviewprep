@@ -1,3 +1,5 @@
+## Initial Prompt
+
 Features 1-10 are done and merged. Now build ONLY this improvement: more behavioral question types, an "Other" option, and user-created custom behavioral categories.
 
 1. NEW SHARED BEHAVIORAL TYPES
@@ -29,6 +31,11 @@ Do not rename or remove any existing types; existing sessions and stories must b
 DO NOT
 - Build case books, the checklist, or the Excel export. Those come next.
 - Change git branches, merge, or push. I manage Git myself.
+
+## Follow up Prompts
+It seems like I am not able to add a new category? Says cannot add category when trying to save it
+
+
 
 WHEN YOU'RE DONE
 Give me: (1) the files you created or changed, (2) a plain-English explanation of how shared and custom types live in the same table and how the app keeps custom ones private, and (3) the npm test result.
