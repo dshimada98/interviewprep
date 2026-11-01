@@ -9,6 +9,7 @@ import { PracticeAreas } from './practice-areas';
 import { NextCaseFocus } from './next-case-focus';
 import { ChecklistCard } from './checklist';
 import { ByCaseBook } from './case-book-panel';
+import { ExportButton } from './export-button';
 import { dashboardKey, statusOf } from './session-keys';
 
 /** Band thresholds match the scorecard scale: below 3 red (1-2), 3 to below 4 amber (3), 4+ green (4-5). */
@@ -207,7 +208,10 @@ export function DashboardPage() {
       <AppHeader />
       <main className="max-w-6xl mx-auto px-5 sm:px-8 py-8 sm:py-12 overflow-x-clip" style={{ color: 'var(--navy)' }}>
         <p className="ip-rise text-xs font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--green-text)' }}>Overview</p>
-        <h1 className="ip-rise mt-2 mb-6 sm:mb-8 text-3xl sm:text-4xl font-bold tracking-tight">Dashboard</h1>
+        <div className="mt-2 mb-6 sm:mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <h1 className="ip-rise text-3xl sm:text-4xl font-bold tracking-tight">Dashboard</h1>
+          <ExportButton />
+        </div>
 
         {d && <div className="mb-5"><NextCaseFocus focus={d.next_case_focus} scoreColor={bandColor} /></div>}
         {(d || !q.isLoading) && <div className="mb-5"><ChecklistCard /></div>}

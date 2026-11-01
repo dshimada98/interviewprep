@@ -73,6 +73,77 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   return result;
 };
 
+export const getExportWorkbookUrl = () => {
+
+
+
+
+  return `/api/export.xlsx`
+}
+
+export const exportWorkbook = async ( options?: Parameters<typeof customFetch>[1]): Promise<Blob> => {
+
+  return customFetch<Blob>(getExportWorkbookUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getExportWorkbookQueryKey = () => {
+    return [
+    `/api/export.xlsx`
+    ] as const;
+    }
+
+
+export const getExportWorkbookQueryOptions = <TData = Awaited<ReturnType<typeof exportWorkbook>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportWorkbook>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getExportWorkbookQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof exportWorkbook>>> = ({ signal }) => exportWorkbook({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof exportWorkbook>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ExportWorkbookQueryResult = NonNullable<Awaited<ReturnType<typeof exportWorkbook>>>
+export type ExportWorkbookQueryError = ErrorType<void>
+
+
+
+export function useExportWorkbook<TData = Awaited<ReturnType<typeof exportWorkbook>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportWorkbook>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getExportWorkbookQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
 export const getGetChecklistUrl = () => {
 
 

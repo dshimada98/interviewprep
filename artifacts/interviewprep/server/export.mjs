@@ -21,7 +21,7 @@ export async function readExportData(userId) {
       FROM section_scores sc JOIN practice_sessions p ON p.id=sc.session_id AND p.user_id=$1
       JOIN question_types q ON q.id=p.question_type_id AND q.kind='case'
       JOIN case_sections s ON s.id=sc.section_id
-      ORDER BY p.session_date DESC,p.created_at DESC,p.id DESC,s.display_order,s.id`, [userId])).rows;
+      ORDER BY p.session_date DESC,s.display_order,s.id,p.created_at DESC,p.id DESC`, [userId])).rows;
     const stories = (await client.query(`SELECT st.*,q.name AS competency_name,
       count(p.id)::int AS times_practiced,round(avg(p.overall_score),1)::float8 AS average_score
       FROM stories st JOIN question_types q ON q.id=st.competency_id

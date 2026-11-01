@@ -8,6 +8,9 @@
 import * as zod from 'zod';
 
 
+export const ExportWorkbookResponse = zod.unknown()
+
+
 export const GetChecklistResponse = zod.object({
   "open": zod.array(zod.object({
   "id": zod.number().int(),
