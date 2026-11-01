@@ -222,3 +222,19 @@ round-trip, deletion persistence, and two-user isolation tests. Browser checks
 should cover create → reload → edit → reload → cancel deletion → confirm
 deletion, and check phone/laptop layouts. No scorecards, stars, dashboard, or
 story features are included.
+
+The root `npm test` script also runs Vitest with Supertest against the exported
+Express app (no listening server required). `tests/data-isolation.test.ts`
+signs up two uniquely named accounts using separate cookie agents, creates
+“Coffee chain profitability” as User A, checks that User B's list is empty and
+direct access returns 404 `Session not found`, and confirms User B cannot update
+or delete A's record. It also checks that a forged `user_id` cannot change
+ownership. Cleanup removes the test login sessions and accounts, relying on
+the foreign-key cascade to remove only their practice sessions.
+
+The session form filters its question-type dropdown with a Case/Behavioral
+toggle, infers the correct toggle when editing, and clears the selection when
+switching kinds. For Feature 3, save failures show only
+“Couldn't save. Please check your entries.” Server-side input checks remain in
+place for security and data integrity; detailed per-field UI messages are
+deferred to Feature 5.

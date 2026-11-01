@@ -11,7 +11,8 @@ Later scorecard, star, dashboard, and story features are not included.
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- `pnpm test` — authentication, data-model, and production-settings integration tests against PostgreSQL
+- `npm test` (or `pnpm test`) — authentication, data-model, session CRUD, production-settings checks, and the root Vitest data-isolation test against PostgreSQL
+- `tests/data-isolation.test.ts` imports the Express app directly; no running web server is required. Test users have unique emails and are removed afterward with their sessions.
 - `pnpm --filter @workspace/interviewprep test:browser` — real browser flows against the running product
 - Required env: `DATABASE_URL` and `SESSION_SECRET` (never print values)
 

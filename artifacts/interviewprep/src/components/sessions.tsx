@@ -17,12 +17,11 @@ import { AppHeader } from './ip';
 const FORMATS = [
   { v: 'solo', label: 'Solo' },
   { v: 'partner', label: 'Partner' },
-  { v: 'mock', label: 'Mock interview' },
+  { v: 'mock', label: 'Mock' },
 ] as const;
 const SCORE_LABEL = ['', 'Struggled', 'Shaky', 'Solid', 'Strong', 'Excellent'];
 const MAX_INT = 2147483647;
 
-type ErrLike = { status?: number; data?: unknown } | null | undefined;
 const statusOf = (e: unknown) => (e && typeof e === 'object' && 'status' in e ? (e as { status: number }).status : undefined);
 
 function use401(error: unknown) {
@@ -145,7 +144,7 @@ export function SessionsListPage() {
       ) : data && data.length === 0 ? (
         <div className="ip-rise mt-8 rounded-xl p-8 sm:p-12 text-center" style={{ background: 'var(--panel)' }} data-testid="status-empty">
           <div className="mx-auto w-fit"><ScoreBar score={3} size="lg" /></div>
-          <h2 className="mt-5 text-xl font-bold">No sessions logged yet</h2>
+          <h2 className="mt-5 text-xl font-bold">No sessions yet</h2>
           <p className="mt-2 text-sm text-muted-foreground max-w-sm mx-auto">Record your first case or behavioral practice to start building a track record you can learn from.</p>
           <Link href="/sessions/new" className="ip-focus mt-6 min-h-11 px-5 rounded-lg inline-flex items-center gap-2 font-semibold text-white" style={{ background: 'var(--navy)' }}>
             <Plus className="h-4 w-4" aria-hidden />Log your first session
@@ -162,7 +161,7 @@ export function SessionsListPage() {
                   <span className="inline-flex items-center gap-1.5 font-semibold"><CalendarDays className="h-4 w-4" aria-hidden />{fmtDate(s.session_date)}</span>
                   <KindTag kind={s.kind} />
                   <span className="text-muted-foreground">{s.question_type_name}</span>
-                  <span className="ml-auto inline-flex items-center gap-2"><ScoreBar score={s.overall_score} /><span className="font-semibold tabular-nums">{s.overall_score}/5</span></span>
+                  <span className="ml-auto inline-flex items-center gap-2"><ScoreBar score={s.overall_score} /><span className="rounded-full px-2.5 py-1 font-semibold tabular-nums text-white" style={{ background: `var(--score-${s.overall_score})` }}>{s.overall_score}/5</span></span>
                 </div>
                 <p className="mt-2.5 font-medium line-clamp-2 break-words group-hover:underline underline-offset-4">{s.prompt}</p>
                 <p className="mt-1.5 text-xs text-muted-foreground">{fmtLabel(s.format)}{s.duration_minutes != null ? ` / ${s.duration_minutes} min` : ''}</p>
@@ -294,15 +293,15 @@ export function SessionDetailPage({ rawId }: { rawId?: string }) {
           <AlertDialog open={open} onOpenChange={(o) => { if (!del.isPending) setOpen(o); }}>
             <AlertDialogContent className="rounded-xl" style={{ color: 'var(--navy)' }}>
               <AlertDialogHeader>
-                <AlertDialogTitle>Delete this session?</AlertDialogTitle>
-                <AlertDialogDescription>This permanently removes the session from {fmtDate(s.session_date)}. This cannot be undone.</AlertDialogDescription>
+                <AlertDialogTitle>Delete this session? This can't be undone.</AlertDialogTitle>
+                <AlertDialogDescription>This permanently removes the session from {fmtDate(s.session_date)}.</AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter className="gap-2">
                 <AlertDialogCancel data-testid="button-cancel-delete" className="ip-focus min-h-11 mt-0" disabled={del.isPending}>Cancel</AlertDialogCancel>
                 <AlertDialogAction data-testid="button-confirm-delete" disabled={del.isPending}
                   onClick={(e) => { e.preventDefault(); confirmDelete(); }}
                   className="ip-focus min-h-11 text-white inline-flex items-center gap-2" style={{ background: 'var(--score-1)' }}>
-                  {del.isPending && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}{del.isPending ? 'Deleting...' : 'Delete session'}
+                  {del.isPending && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}{del.isPending ? 'Deleting...' : 'Delete'}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
@@ -318,6 +317,7 @@ export function SessionDetailPage({ rawId }: { rawId?: string }) {
 type FormVals = { session_date: string; question_type_id: string; prompt: string; format: string; overall_score: string; duration_minutes: string; went_well: string; to_improve: string };
 type Errs = Partial<Record<keyof FormVals | 'form', string>>;
 const EMPTY: FormVals = { session_date: '', question_type_id: '', prompt: '', format: '', overall_score: '', duration_minutes: '', went_well: '', to_improve: '' };
+const SAVE_ERROR = "Couldn't save. Please check your entries.";
 
 function today() {
   const d = new Date();
@@ -353,26 +353,15 @@ function validate(v: FormVals, typeIds: Set<number>): [Errs, SessionInput | null
   const ww = v.went_well.trim(), ti = v.to_improve.trim();
   if (ww.length > 4000) e.went_well = 'Must be 4000 characters or fewer.';
   if (ti.length > 4000) e.to_improve = 'Must be 4000 characters or fewer.';
-  if (Object.keys(e).length) return [e, null];
+  if (Object.keys(e).length) return [{ form: SAVE_ERROR }, null];
   return [e, {
     session_date: date, question_type_id: qt, prompt, format: v.format as SessionInput['format'], overall_score: sc,
     duration_minutes: durN, went_well: ww || null, to_improve: ti || null,
   }];
 }
 
-function serverErrs(err: unknown): Errs {
-  const st = statusOf(err);
-  const data = (err as ErrLike)?.data as { message?: string; errors?: Record<string, string> } | undefined;
-  const out: Errs = {};
-  if (data?.errors && typeof data.errors === 'object') {
-    for (const [k, msg] of Object.entries(data.errors)) {
-      if (k in EMPTY) out[k as keyof FormVals] = msg; else out.form = msg;
-    }
-  }
-  if (!Object.keys(out).length || (st && st !== 400 && st !== 422)) {
-    out.form = st === 401 ? 'Your session has expired. Please log in again.' : data?.message || 'Unable to save this session. Please try again.';
-  }
-  return out;
+function serverErrs(_err: unknown): Errs {
+  return { form: SAVE_ERROR };
 }
 
 const inputCls = 'ip-focus block w-full min-h-11 rounded-lg border bg-white px-3.5 text-base transition-colors hover:border-[color:var(--navy)]';
@@ -398,11 +387,12 @@ function SessionForm({ initial, submitLabel, busy, onSubmit, cancelHref, serverE
   const { user } = useAuth();
   const [v, setV] = useState<FormVals>(initial);
   const [errs, setErrs] = useState<Errs>({});
+  const [kind, setKind] = useState<'case' | 'behavioral' | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
   useEffect(() => { if (Object.keys(serverErrors).length) setErrs(serverErrors); }, [serverErrors]);
   useEffect(() => {
     if (!Object.keys(errs).length) return;
-    formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
+    formRef.current?.querySelector<HTMLElement>('[data-testid="status-form-error"]')?.focus();
   }, [errs]);
 
   const types = useGetQuestionTypes({
@@ -410,12 +400,14 @@ function SessionForm({ initial, submitLabel, busy, onSubmit, cancelHref, serverE
     request: sessionRequestOptions(),
   });
   use401(types.error);
+  // Editing infers the initial kind from the saved type once reference data loads.
+  const activeKind = kind ?? (types.data?.behavioral.some(t => String(t.id) === initial.question_type_id) ? 'behavioral' : 'case');
   const set = (k: keyof FormVals) => (val: string) => setV(p => ({ ...p, [k]: val }));
 
   function submit(e: FormEvent) {
     e.preventDefault();
     if (busy) return;
-    const ids = new Set([...(types.data?.case ?? []), ...(types.data?.behavioral ?? [])].map(t => t.id));
+    const ids = new Set((types.data?.[activeKind] ?? []).map(t => t.id));
     const [er, input] = validate(v, ids);
     setErrs(er);
     if (input) onSubmit(input);
@@ -425,7 +417,22 @@ function SessionForm({ initial, submitLabel, busy, onSubmit, cancelHref, serverE
 
   return (
     <form ref={formRef} noValidate onSubmit={submit} className="ip-rise mt-6 rounded-xl p-5 sm:p-8 space-y-6" style={{ background: 'var(--panel)' }}>
-      {errs.form && <div className="rounded-lg bg-white border-l-4 p-3" style={{ borderColor: 'var(--score-1)' }} data-testid="status-form-error"><ErrText>{errs.form}</ErrText></div>}
+      {errs.form && <div tabIndex={-1} className="rounded-lg bg-white border-l-4 p-3" style={{ borderColor: 'var(--score-1)' }} data-testid="status-form-error"><ErrText>{errs.form}</ErrText></div>}
+
+      <div role="radiogroup" aria-label="Practice kind" className="grid grid-cols-2 gap-2">
+        {(['case', 'behavioral'] as const).map(k => (
+          <button key={k} type="button" role="radio" aria-checked={activeKind === k}
+            data-testid={`toggle-kind-${k}`} disabled={busy || !types.data}
+            className="ip-focus min-h-11 rounded-lg border px-4 font-semibold disabled:opacity-60"
+            style={{ background: activeKind === k ? 'var(--navy)' : 'white', color: activeKind === k ? 'white' : 'var(--navy)' }}
+            onClick={() => {
+              if (activeKind !== k) {
+                setKind(k);
+                setV(p => ({ ...p, question_type_id: '' }));
+              }
+            }}>{k === 'case' ? 'Case' : 'Behavioral'}</button>
+        ))}
+      </div>
 
       <div className="grid gap-5 sm:grid-cols-2">
         <FieldWrap id="session_date" label="Session date" error={errs.session_date} hint="Format YYYY-MM-DD">
@@ -445,11 +452,7 @@ function SessionForm({ initial, submitLabel, busy, onSubmit, cancelHref, serverE
               <select {...aria('question_type_id', errs.question_type_id)} data-testid="select-question-type" className={inputCls}
                 value={v.question_type_id} onChange={e => set('question_type_id')(e.target.value)}>
                 <option value="">Choose a type</option>
-                {(['case', 'behavioral'] as const).map(k => (
-                  <optgroup key={k} label={k === 'case' ? 'Case' : 'Behavioral'}>
-                    {(types.data?.[k] ?? []).map(t => <option key={t.id} value={String(t.id)}>{t.name}</option>)}
-                  </optgroup>
-                ))}
+                 {(types.data?.[activeKind] ?? []).map(t => <option key={t.id} value={String(t.id)}>{t.name}</option>)}
               </select>
             )}
         </FieldWrap>
@@ -457,7 +460,7 @@ function SessionForm({ initial, submitLabel, busy, onSubmit, cancelHref, serverE
 
       <FieldWrap id="prompt" label="Prompt" error={errs.prompt} hint="The case question or behavioral prompt you practiced.">
         <textarea {...aria('prompt', errs.prompt, true)} data-testid="input-prompt" rows={3} className={`${inputCls} py-2.5`}
-          value={v.prompt} onChange={e => set('prompt')(e.target.value)} />
+           placeholder="Coffee chain profits down 15%" value={v.prompt} onChange={e => set('prompt')(e.target.value)} />
       </FieldWrap>
 
       <fieldset className="space-y-2" aria-describedby={errs.format ? 'format-err' : undefined}>
@@ -504,7 +507,7 @@ function SessionForm({ initial, submitLabel, busy, onSubmit, cancelHref, serverE
 
       <div className="grid gap-5 md:grid-cols-2">
         {(['went_well', 'to_improve'] as const).map(k => (
-          <FieldWrap key={k} id={k} label={k === 'went_well' ? 'What went well' : 'To improve'} optional error={errs[k]}>
+          <FieldWrap key={k} id={k} label={k === 'went_well' ? 'What went well' : 'What to improve'} optional error={errs[k]}>
             <textarea {...aria(k, errs[k])} data-testid={`input-${k.replace('_', '-')}`} rows={5} className={`${inputCls} py-2.5`}
               value={v[k]} onChange={e => set(k)(e.target.value)} />
             {!errs[k] && <p className="text-xs text-muted-foreground text-right">{counter(v[k])}</p>}
@@ -591,8 +594,7 @@ export function EditSessionPage({ rawId }: { rawId?: string }) {
                 nav(`/sessions/${s.id}`);
               },
               onError: (e) => {
-                if (statusOf(e) === 404) setSrvErr({ form: 'This session no longer exists. It may have been deleted.' });
-                else setSrvErr(serverErrs(e));
+                setSrvErr(serverErrs(e));
               },
             })} />
         </>

@@ -202,7 +202,8 @@ export function AppHeader() {
         <Link href="/" className="ip-focus min-h-11 inline-flex items-center rounded"><Mark /></Link>
         <div className="hidden sm:flex items-center gap-4">
           <Link href="/sessions" data-testid="link-nav-sessions" className="ip-focus min-h-11 px-3 rounded-lg inline-flex items-center gap-2 font-semibold hover:bg-white/10"><ListChecks className="h-4 w-4" aria-hidden />Sessions</Link>
-          <span className="text-sm text-white/75 truncate max-w-[16rem]">{user?.email}</span>
+          <Link href="/sessions/new" data-testid="link-nav-log-session" className="ip-focus min-h-11 px-3 rounded-lg inline-flex items-center justify-center font-semibold border border-white/30">+ Log session</Link>
+          <span className="hidden lg:inline text-sm text-white/75 truncate max-w-[12rem]">{user?.email}</span>
           {btn}
         </div>
         <button className="sm:hidden ip-focus h-11 w-11 grid place-items-center rounded-lg border border-white/30"
@@ -213,6 +214,7 @@ export function AppHeader() {
       {open && (
         <div id="mobile-menu" className="sm:hidden px-5 pb-4 space-y-3 ip-rise">
           <Link href="/sessions" onClick={() => setOpen(false)} className="ip-focus min-h-11 w-full rounded-lg inline-flex items-center justify-center gap-2 font-semibold border border-white/30"><ListChecks className="h-4 w-4" aria-hidden />Sessions</Link>
+          <Link href="/sessions/new" onClick={() => setOpen(false)} className="ip-focus min-h-11 w-full rounded-lg inline-flex items-center justify-center font-semibold border border-white/30">+ Log session</Link>
           <p className="text-sm text-white/75 break-all">{user?.email}</p>
           <div className="[&>button]:w-full [&>button]:justify-center">{btn}</div>
         </div>

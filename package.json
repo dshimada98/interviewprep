@@ -7,14 +7,17 @@
     "build": "pnpm run typecheck && PORT=5000 BASE_PATH=/ pnpm -r --if-present run build",
     "typecheck:libs": "tsc --build",
     "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck",
-    "test": "pnpm --filter @workspace/interviewprep test"
+    "test": "pnpm --filter @workspace/interviewprep test && vitest run --config vitest.config.ts"
   },
   "private": true,
   "dependencies": {
     "@replit/connectors-sdk": "^0.4.3"
   },
   "devDependencies": {
+    "@types/supertest": "^7.2.1",
     "prettier": "^3.9.10",
-    "typescript": "~5.9.3"
+    "supertest": "^7.3.1",
+    "typescript": "~5.9.3",
+    "vitest": "^5.0.5"
   }
 }

@@ -27,7 +27,7 @@ const input = z.object({
 const fields = `s.id, s.question_type_id, s.session_date::text, s.prompt, s.format,
   s.overall_score, s.duration_minutes, s.went_well, s.to_improve, s.created_at,
   q.name AS question_type_name, q.kind`;
-const notFound = res => res.status(404).json({ message: 'Session not found.' });
+const notFound = res => res.status(404).json({ message: 'Session not found' });
 
 async function validated(body, res) {
   const result = input.safeParse(body);
