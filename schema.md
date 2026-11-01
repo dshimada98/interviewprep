@@ -52,12 +52,17 @@ case sessions, while a case session has one book or none.
 | --- | --- | --- |
 | id | integer (`SERIAL`) | Primary key |
 | name | text | Required, nonblank, at most 60 characters |
+| publication_year | integer, nullable | Optional four-digit publication year (1000–9999); NULL means unknown |
 | user_id | integer, nullable | References users.id, ON DELETE CASCADE; NULL means shared |
 | created_at | timestamp with time zone | Required, defaults to now() |
 
 Partial unique indexes and a scope-check trigger enforce case-insensitive,
-whitespace-normalized uniqueness against shared names and the user's own books.
-Different private owners may use the same name. Server identity—not submitted
+whitespace-normalized uniqueness for the **same name and publication year**
+against shared editions and the user's own books. Different years are separate
+books with separate IDs, session filters, and dashboard aggregates. Unknown-year
+books are distinct from dated editions; two unknown-year books with the same
+name still conflict within the same visibility scope. Different private owners
+may use the same edition. Server identity—not submitted
 `user_id`—determines ownership. Lists, saves, and filters enforce visibility.
 
 Shared seeds: Case in Point, Victor Cheng (Case Interview Secrets), Haas Casebook,
@@ -70,7 +75,12 @@ alphabetically, then the user's private books alphabetically. The most recent
 case is ordered by session date, creation timestamp, then ID descending. Its book
 ID (including NULL for a live case) defaults only the new-session form; editing
 keeps the saved book, and refetching never overwrites a user's draft choice.
-`POST /api/case-books` accepts `{ name }` and creates a private book.
+`POST /api/case-books` accepts `{ name, publication_year? }` and creates a private
+book. The year is optional; omitted/null leaves it unknown. Existing books and
+links keep their IDs and an unknown year; shared seed years are never guessed.
+The form, filters, session cards/details, and dashboard show known years as
+`Name (2025)`. Session responses expose `case_book_publication_year`; dashboard
+book rows expose `publication_year`.
 
 ## practice_sessions
 
@@ -185,6 +195,7 @@ erDiagram
     case_books {
         integer id PK
         text name
+        integer publication_year
         integer user_id FK
         timestamptz created_at
     }

@@ -5,6 +5,7 @@ import { createCaseBook, useCreateCaseBook, useGetCaseBooks, type CaseBook, type
 import { authRequest, sessionRequestOptions, useAuth } from '@/auth';
 import { caseBooksKey, statusOf } from './session-keys';
 import { isCustom } from './category-select';
+import { caseBookLabel } from './case-book-label';
 
 const ADD_BOOK = '__add_book__';
 const GENERIC = "Couldn't add that case book. Please try again.";
@@ -12,13 +13,14 @@ export const NO_BOOK = 'No book / live case';
 
 /** Shared alphabetically, then the user's own alphabetically. Mirrors the server ordering. */
 function sortBooks(list: CaseBook[]) {
-  return [...list].sort((a, b) => Number(isCustom(a)) - Number(isCustom(b)) || a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+  return [...list].sort((a, b) => Number(isCustom(a)) - Number(isCustom(b)) || a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+    || (b.publication_year ?? 0) - (a.publication_year ?? 0));
 }
 
 function errMessage(e: unknown) {
   if (e && typeof e === 'object' && 'data' in e) {
     const d = (e as { data?: { errors?: Record<string, unknown>; message?: unknown } | null }).data;
-    const n = d?.errors?.name;
+    const n = d?.errors?.name ?? d?.errors?.publication_year;
     if (typeof n === 'string' && n) return n;
     if (statusOf(e) === 401) return 'Please sign in again in another tab, then try saving this case book again. Your draft is still here.';
     if (typeof d?.message === 'string' && d.message) return d.message;
@@ -45,6 +47,7 @@ export function CaseBookSelect({ id, value, onChange, onAddingChange, disabled, 
   const books = useCaseBooks();
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState('');
+  const [year, setYear] = useState('');
   const [err, setErr] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const selectRef = useRef<HTMLSelectElement>(null);
@@ -68,18 +71,22 @@ export function CaseBookSelect({ id, value, onChange, onAddingChange, disabled, 
     },
   });
 
-  function close() { setAdding(false); setName(''); setErr(''); requestAnimationFrame(() => selectRef.current?.focus()); }
+  function close() { setAdding(false); setName(''); setYear(''); setErr(''); requestAnimationFrame(() => selectRef.current?.focus()); }
 
   function save() {
     if (create.isPending) return;
+    if (year.trim() && (!/^\d{4}$/.test(year.trim()) || Number(year) < 1000)) {
+      setErr('Please enter a four-digit year, like 2025.');
+      return;
+    }
     setErr('');
-    create.mutate({ data: { name } }, {
+    create.mutate({ data: { name, publication_year: year.trim() ? Number(year) : null } }, {
       onSuccess: b => {
         qc.setQueryData<CaseBookList>(caseBooksKey(user?.id), old => old && !old.books.some(x => x.id === b.id)
           ? { ...old, books: sortBooks([...old.books, b]) } : old);
         void qc.invalidateQueries({ queryKey: caseBooksKey(user?.id), exact: true });
         onChange(String(b.id));
-        setAdding(false); setName('');
+        setAdding(false); setName(''); setYear('');
         requestAnimationFrame(() => selectRef.current?.focus());
       },
       onError: e => setErr(errMessage(e)),
@@ -107,7 +114,7 @@ export function CaseBookSelect({ id, value, onChange, onAddingChange, disabled, 
         onChange={e => { if (e.target.value === ADD_BOOK) { setAdding(true); setErr(''); } else onChange(e.target.value); }}>
         <option value="">{NO_BOOK}</option>
         {missing && <option value={value}>Saved case book</option>}
-        {list.map(b => <option key={b.id} value={String(b.id)}>{b.name}{isCustom(b) ? ' (custom)' : ''}</option>)}
+        {list.map(b => <option key={b.id} value={String(b.id)}>{caseBookLabel(b.name, b.publication_year)}{isCustom(b) ? ' (custom)' : ''}</option>)}
         <option value={ADD_BOOK}>+ Add your own case book</option>
       </select>
       {adding && (
@@ -123,6 +130,19 @@ export function CaseBookSelect({ id, value, onChange, onAddingChange, disabled, 
               if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); save(); }
               else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); if (!create.isPending) close(); }
             }} />
+          <label htmlFor={`${id}-year`} className="block text-sm font-semibold">
+            Publication year <span className="font-normal text-muted-foreground">(optional)</span>
+          </label>
+          <input id={`${id}-year`} data-testid="input-case-book-year" value={year}
+            type="text" inputMode="numeric" maxLength={4} placeholder="2025" disabled={create.isPending}
+            aria-describedby={`${id}-year-hint${err ? ` ${errId}` : ''}`}
+            className="ip-focus block w-full min-w-0 min-h-11 rounded-lg border bg-white px-3.5 text-base"
+            onChange={e => { setYear(e.target.value); if (err) setErr(''); }}
+            onKeyDown={e => {
+              if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); save(); }
+              else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); if (!create.isPending) close(); }
+            }} />
+          <p id={`${id}-year-hint`} className="text-xs text-muted-foreground">Different years are tracked as separate editions.</p>
           {err && <p id={errId} role="alert" className="text-sm font-medium" style={{ color: '#C0392B' }} data-testid="text-case-book-error">{err}</p>}
           <div className="grid grid-cols-2 sm:flex sm:justify-end gap-2">
             <button type="button" data-testid="button-cancel-case-book" disabled={create.isPending} onClick={close}

@@ -12,6 +12,7 @@ export async function seedCaseBooks(database = pool) {
   await database.query(`INSERT INTO case_books (name)
     SELECT seed.name FROM unnest($1::text[]) AS seed(name)
     WHERE NOT EXISTS (SELECT 1 FROM case_books b WHERE b.user_id IS NULL
+      AND b.publication_year IS NULL
       AND category_name_key(b.name)=category_name_key(seed.name))
     ON CONFLICT DO NOTHING`, [caseBookSeeds]);
 }
@@ -26,7 +27,7 @@ export async function visibleCaseBook(database, id, userId) {
 export const caseBooks = Router();
 caseBooks.get('/', async (req, res) => {
   const { rows } = await pool.query(`SELECT
-    (SELECT coalesce(jsonb_agg(to_jsonb(b) ORDER BY (b.user_id IS NOT NULL), lower(b.name), b.id), '[]'::jsonb)
+    (SELECT coalesce(jsonb_agg(to_jsonb(b) ORDER BY (b.user_id IS NOT NULL), lower(b.name), b.publication_year DESC NULLS LAST, b.id), '[]'::jsonb)
       FROM case_books b WHERE b.user_id IS NULL OR b.user_id=$1) AS books,
     (SELECT p.case_book_id FROM practice_sessions p JOIN question_types q ON q.id=p.question_type_id
       WHERE p.user_id=$1 AND q.kind='case'
@@ -39,14 +40,18 @@ caseBooks.post('/', async (req, res) => {
   const invalid = message => res.status(400).json({ errors: { name: message } });
   if (!name) return invalid('Please enter a case book name.');
   if (name.length > 60) return invalid('Please keep it under 60 characters.');
+  const year = req.body?.publication_year ?? null;
+  if (year !== null && (!Number.isInteger(year) || year < 1000 || year > 9999)) {
+    return res.status(400).json({ errors: { publication_year: 'Please enter a four-digit year, like 2025.' } });
+  }
   try {
     const { rows } = await pool.query(
-      'INSERT INTO case_books (name,user_id) VALUES ($1,$2) RETURNING id,name,user_id,created_at',
-      [name, req.user.id],
+      'INSERT INTO case_books (name,user_id,publication_year) VALUES ($1,$2,$3) RETURNING id,name,user_id,publication_year,created_at',
+      [name, req.user.id, year],
     );
     res.status(201).json(rows[0]);
   } catch (error) {
-    if (error.code === '23505') return invalid(`You already have a case book called ${name}.`);
+    if (error.code === '23505') return invalid(`You already have a case book called ${name}${year === null ? '' : ` (${year})`}.`);
     throw error;
   }
 });

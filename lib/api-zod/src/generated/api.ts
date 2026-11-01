@@ -242,6 +242,7 @@ export const getDashboardResponseNextCaseFocusMax = 2;
 
 export const GetDashboardResponse = zod.object({
   "by_case_book": zod.array(zod.object({
+  "publication_year": zod.number().int().nullable(),
   "case_book_id": zod.number().int().nullable(),
   "name": zod.string(),
   "count": zod.number().int(),
@@ -361,6 +362,7 @@ export const ListSessionsResponse = zod.object({
   "went_well": zod.string().max(listSessionsResponseSessionsItemOneWentWellMax).nullish(),
   "to_improve": zod.string().max(listSessionsResponseSessionsItemOneToImproveMax).nullish()
 }).and(zod.object({
+  "case_book_publication_year": zod.number().int().nullable(),
   "case_book_id": zod.number().int().nullable(),
   "case_book_name": zod.string().nullable(),
   "story_id": zod.number().int().nullable(),
@@ -478,6 +480,7 @@ export const CreateSessionResponse = zod.object({
   "went_well": zod.string().max(createSessionResponseOneOneWentWellMax).nullish(),
   "to_improve": zod.string().max(createSessionResponseOneOneToImproveMax).nullish()
 }).and(zod.object({
+  "case_book_publication_year": zod.number().int().nullable(),
   "case_book_id": zod.number().int().nullable(),
   "case_book_name": zod.string().nullable(),
   "story_id": zod.number().int().nullable(),
@@ -580,6 +583,7 @@ export const GetSessionResponse = zod.object({
   "went_well": zod.string().max(getSessionResponseOneOneWentWellMax).nullish(),
   "to_improve": zod.string().max(getSessionResponseOneOneToImproveMax).nullish()
 }).and(zod.object({
+  "case_book_publication_year": zod.number().int().nullable(),
   "case_book_id": zod.number().int().nullable(),
   "case_book_name": zod.string().nullable(),
   "story_id": zod.number().int().nullable(),
@@ -710,6 +714,7 @@ export const UpdateSessionResponse = zod.object({
   "went_well": zod.string().max(updateSessionResponseOneOneWentWellMax).nullish(),
   "to_improve": zod.string().max(updateSessionResponseOneOneToImproveMax).nullish()
 }).and(zod.object({
+  "case_book_publication_year": zod.number().int().nullable(),
   "case_book_id": zod.number().int().nullable(),
   "case_book_name": zod.string().nullable(),
   "story_id": zod.number().int().nullable(),
@@ -742,6 +747,7 @@ export const DeleteSessionResponse = zod.void()
 
 export const GetCaseBooksResponse = zod.object({
   "books": zod.array(zod.object({
+  "publication_year": zod.number().int().nullable(),
   "id": zod.number().int(),
   "name": zod.string(),
   "user_id": zod.number().int().nullable(),
@@ -751,15 +757,20 @@ export const GetCaseBooksResponse = zod.object({
 })
 
 
+export const createCaseBookBodyPublicationYearMin = 1000;
+export const createCaseBookBodyPublicationYearMax = 9999;
+
 export const createCaseBookBodyNameMax = 60;
 
 
 
 export const CreateCaseBookBody = zod.object({
+  "publication_year": zod.number().int().min(createCaseBookBodyPublicationYearMin).max(createCaseBookBodyPublicationYearMax).nullish(),
   "name": zod.string().max(createCaseBookBodyNameMax)
 })
 
 export const CreateCaseBookResponse = zod.object({
+  "publication_year": zod.number().int().nullable(),
   "id": zod.number().int(),
   "name": zod.string(),
   "user_id": zod.number().int().nullable(),

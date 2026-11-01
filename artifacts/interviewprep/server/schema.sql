@@ -52,15 +52,19 @@ CREATE TABLE IF NOT EXISTS case_books (
   user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-CREATE UNIQUE INDEX IF NOT EXISTS case_books_shared_name_idx
-  ON case_books (category_name_key(name)) WHERE user_id IS NULL;
-CREATE UNIQUE INDEX IF NOT EXISTS case_books_private_name_idx
-  ON case_books (user_id, category_name_key(name)) WHERE user_id IS NOT NULL;
+ALTER TABLE case_books ADD COLUMN IF NOT EXISTS publication_year INTEGER
+  CHECK (publication_year BETWEEN 1000 AND 9999);
+CREATE UNIQUE INDEX IF NOT EXISTS case_books_shared_edition_idx
+  ON case_books (category_name_key(name), coalesce(publication_year, 0)) WHERE user_id IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS case_books_private_edition_idx
+  ON case_books (user_id, category_name_key(name), coalesce(publication_year, 0)) WHERE user_id IS NOT NULL;
 CREATE OR REPLACE FUNCTION check_case_book_scope() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
-  PERFORM pg_advisory_xact_lock(hashtextextended('case-book:' || category_name_key(NEW.name), 0));
+  PERFORM pg_advisory_xact_lock(hashtextextended('case-book:' || category_name_key(NEW.name)
+    || ':' || coalesce(NEW.publication_year, 0)::text, 0));
   IF EXISTS (SELECT 1 FROM case_books b WHERE b.id <> NEW.id
       AND category_name_key(b.name) = category_name_key(NEW.name)
+      AND b.publication_year IS NOT DISTINCT FROM NEW.publication_year
       AND ((NEW.user_id IS NULL AND b.user_id IS NOT NULL)
         OR (NEW.user_id IS NOT NULL AND b.user_id IS NULL))) THEN
     RAISE EXCEPTION 'Duplicate case book' USING ERRCODE = '23505';
@@ -70,6 +74,8 @@ END;
 $$;
 CREATE OR REPLACE TRIGGER case_books_scope_check BEFORE INSERT OR UPDATE ON case_books
   FOR EACH ROW EXECUTE FUNCTION check_case_book_scope();
+DROP INDEX IF EXISTS case_books_shared_name_idx;
+DROP INDEX IF EXISTS case_books_private_name_idx;
 
 CREATE TABLE IF NOT EXISTS stories (
   id SERIAL PRIMARY KEY,

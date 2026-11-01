@@ -10,6 +10,8 @@ const fields = `s.id, s.question_type_id, s.session_date::text, s.prompt, s.form
   q.name AS question_type_name, q.kind, s.story_id, s.case_book_id,
   (SELECT b.name FROM case_books b WHERE b.id=s.case_book_id
     AND (b.user_id IS NULL OR b.user_id=s.user_id) AND q.kind='case') AS case_book_name,
+  (SELECT b.publication_year FROM case_books b WHERE b.id=s.case_book_id
+    AND (b.user_id IS NULL OR b.user_id=s.user_id) AND q.kind='case') AS case_book_publication_year,
   (SELECT st.title FROM stories st WHERE st.id=s.story_id AND st.user_id=s.user_id
     AND q.kind='behavioral') AS story_title,
   EXISTS (SELECT 1 FROM stars st WHERE st.session_id=s.id AND st.user_id=s.user_id) AS starred`;

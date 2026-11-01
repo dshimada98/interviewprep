@@ -7,6 +7,7 @@ import {
 } from '@workspace/api-client-react';
 import { sessionRequestOptions, useAuth } from '@/auth';
 import { NO_BOOK, useCaseBooks } from './case-book-select';
+import { caseBookLabel } from './case-book-label';
 
 const KINDS: { v: ListSessionsKind | ''; label: string }[] = [{ v: '', label: 'All' }, { v: 'case', label: 'Case' }, { v: 'behavioral', label: 'Behavioral' }];
 const SCORES: { v: ListSessionsScore | ''; label: string; color: string }[] = [
@@ -198,7 +199,7 @@ export function FinderControls({ f }: { f: SessionFinder }) {
               value={state.book} onChange={e => f.update({ book: e.target.value })}>
               <option value="">{f.booksError ? 'Books unavailable' : f.books ? 'All books' : 'Loading books'}</option>
               <option value="none">{NO_BOOK}</option>
-              {(f.books ?? []).map(b => <option key={b.id} value={String(b.id)}>{b.name}{b.user_id != null ? ' (custom)' : ''}</option>)}
+              {(f.books ?? []).map(b => <option key={b.id} value={String(b.id)}>{caseBookLabel(b.name, b.publication_year)}{b.user_id != null ? ' (custom)' : ''}</option>)}
             </select>
             <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2" aria-hidden />
           </span>

@@ -42,3 +42,11 @@ value or a choice the user already made in the current draft.
 **How to apply:** Preserve this workflow when changing form initialization,
 query refreshes, or the case-book selector; “No book / live case” is an intentional
 choice, not missing data to replace with an older book.
+
+Different publication years are separate case-book editions, not an editable
+year on a single shared identity. Unknown years remain blank.
+
+**Why:** The user explicitly chose “Separate books by year.”
+
+**How to apply:** Keep edition-specific sessions, filters, dashboard counts, and
+defaults distinct; do not merge books merely because their titles match.

@@ -55,12 +55,12 @@ export async function getDashboard(userId) {
         FROM type_stats WHERE count >= 2 ORDER BY average, name, id LIMIT 1) AS weakest_case_type,
       (SELECT count(*)::int FROM owned WHERE kind = 'behavioral') AS behavioral_sessions,
       (SELECT coalesce(jsonb_agg(to_jsonb(b) ORDER BY b.count DESC, b.name, b.case_book_id NULLS LAST), '[]'::jsonb)
-        FROM (SELECT c.case_book_id, coalesce(b.name, 'No book / live case') AS name,
+        FROM (SELECT c.case_book_id, coalesce(b.name, 'No book / live case') AS name, b.publication_year,
           count(*)::int AS count, round(avg(c.overall_score), 1)::float8 AS average_score,
           max(c.session_date)::text AS last_practiced
           FROM cases c LEFT JOIN case_books b ON b.id=c.case_book_id
             AND (b.user_id IS NULL OR b.user_id=$1)
-          GROUP BY c.case_book_id, b.name) b) AS by_case_book,
+          GROUP BY c.case_book_id, b.name, b.publication_year) b) AS by_case_book,
       (SELECT coalesce(jsonb_agg(jsonb_build_object('id', id, 'name', name, 'count', count)
         ORDER BY id), '[]'::jsonb) FROM type_stats) AS cases_by_type,
       (SELECT coalesce(jsonb_agg(to_jsonb(s) ORDER BY display_order, id), '[]'::jsonb)

@@ -17,6 +17,7 @@ import { detailKey, invalidateLists, listKey, removeFromLists, starredKey, statu
 import { StorySelect } from './story-select';
 import { CategorySelect } from './category-select';
 import { CaseBookSelect, NO_BOOK, useCaseBooks } from './case-book-select';
+import { caseBookLabel } from './case-book-label';
 import { ClearFilters, FinderControls, useSessionFinder } from './session-finder';
 import { STAR_ERROR, StarButton, useStarToggle, type StarToggle } from './session-stars';
 import { ScorecardEditor, ScorecardView, draftsFrom, draftsToInput, useCaseSections, type ScoreDrafts } from './scorecard';
@@ -129,7 +130,7 @@ function SessionCards({ data, star }: { data: PracticeSession[]; star: StarToggl
               <span className="ml-auto inline-flex items-center gap-2"><ScoreBar score={s.overall_score} /><span className="rounded-full px-2.5 py-1 font-semibold tabular-nums text-white" style={{ background: `var(--score-${s.overall_score})` }}>{s.overall_score}/5</span></span>
             </div>
             <p className="mt-2.5 font-medium line-clamp-2 break-words group-hover:underline underline-offset-4">{s.prompt}</p>
-            {s.kind === 'case' && <p className="mt-1.5 text-xs text-muted-foreground break-words" data-testid={`text-case-book-${s.id}`}>{s.case_book_name ?? NO_BOOK}</p>}
+            {s.kind === 'case' && <p className="mt-1.5 text-xs text-muted-foreground break-words" data-testid={`text-case-book-${s.id}`}>{caseBookLabel(s.case_book_name ?? NO_BOOK, s.case_book_publication_year)}</p>}
             <p className="mt-1 text-xs text-muted-foreground">{fmtLabel(s.format)}{s.duration_minutes != null ? ` / ${s.duration_minutes} min` : ''}</p>
           </Link>
           <div className="absolute top-3 right-3 sm:top-4 sm:right-4"><StarButton session={s} star={star} /></div>
@@ -318,7 +319,7 @@ export function SessionDetailPage({ rawId }: { rawId?: string }) {
                 <KindTag kind={s.kind} />
                 <span className="font-semibold">{s.question_type_name}</span>
               </div>
-              {s.kind === 'case' && <p className="mt-2 text-sm text-muted-foreground break-words" data-testid="text-case-book">{s.case_book_name ?? NO_BOOK}</p>}
+              {s.kind === 'case' && <p className="mt-2 text-sm text-muted-foreground break-words" data-testid="text-case-book">{caseBookLabel(s.case_book_name ?? NO_BOOK, s.case_book_publication_year)}</p>}
               <h1 className="mt-3 text-2xl sm:text-3xl font-bold tracking-tight break-words whitespace-pre-wrap" data-testid="text-prompt">{s.prompt}</h1>
               {s.kind === 'behavioral' && s.story_id != null && (
                 <p className="mt-3 text-sm" data-testid="text-story-used">
@@ -485,10 +486,12 @@ function SessionForm({ initial, submitLabel, busy, onSubmit, cancelHref, serverE
   const bookTouched = useRef(!defaultLatestBook);
   const latest = books.data?.most_recent_case_book_id;
   useEffect(() => {
-    if (bookTouched.current || latest === undefined) return;
+    // Cached data can still describe the session before the last save. Wait
+    // for the mount-time refetch before consuming this one-time default.
+    if (bookTouched.current || latest === undefined || books.isFetching || books.error) return;
     bookTouched.current = true;
     if (latest !== null) setV(p => ({ ...p, case_book_id: String(latest) }));
-  }, [latest]);
+  }, [latest, books.isFetching, books.error]);
   const sections = useCaseSections();
   use401(sections.error);
   const formRef = useRef<HTMLFormElement>(null);

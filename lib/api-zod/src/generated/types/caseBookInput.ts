@@ -7,6 +7,12 @@
  */
 
 export interface CaseBookInput {
+  /**
+     * @minimum 1000
+     * @maximum 9999
+     * @nullable
+     */
+  publication_year?: number | null;
   /** @maxLength 60 */
   name: string;
 }

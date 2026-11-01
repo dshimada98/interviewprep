@@ -66,6 +66,8 @@ export type StoryDetail = StorySummary & {
 
 export interface DashboardCaseBook {
   /** @nullable */
+  publication_year: number | null;
+  /** @nullable */
   case_book_id: number | null;
   name: string;
   count: number;
@@ -146,11 +148,19 @@ export interface DashboardSummary {
 }
 
 export interface CaseBookInput {
+  /**
+     * @minimum 1000
+     * @maximum 9999
+     * @nullable
+     */
+  publication_year?: number | null;
   /** @maxLength 60 */
   name: string;
 }
 
 export interface CaseBook {
+  /** @nullable */
+  publication_year: number | null;
   id: number;
   name: string;
   /** @nullable */
@@ -265,6 +275,8 @@ export const PracticeSessionKind = {
 } as const;
 
 export type PracticeSession = SessionInput & ({
+  /** @nullable */
+  case_book_publication_year: number | null;
   /** @nullable */
   case_book_id: number | null;
   /** @nullable */

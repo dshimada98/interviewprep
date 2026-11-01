@@ -8,6 +8,8 @@
 
 export interface DashboardCaseBook {
   /** @nullable */
+  publication_year: number | null;
+  /** @nullable */
   case_book_id: number | null;
   name: string;
   count: number;

@@ -55,6 +55,79 @@ afterAll(async () => {
 });
 
 describe('practice-session data isolation', () => {
+  it('tracks publication-year editions separately without changing unyearred books or privacy', async () => {
+    const a = await signUp(), b = await signUp();
+    const before = (await a.agent.get('/api/case-books').expect(200)).body.books;
+    const shared = before.find((book: { name: string }) => book.name === 'Haas Casebook');
+    expect(shared.publication_year).toBeNull();
+    const post = (year: number | null, name = 'Haas Casebook') => a.agent.post('/api/case-books')
+      .set('X-CSRF-Token', a.csrfToken).send({ name, publication_year: year });
+    const old = (await post(2024).expect(201)).body;
+    const recent = (await post(2025).expect(201)).body;
+    expect(old.id).not.toBe(recent.id);
+    expect(old.publication_year).toBe(2024);
+    const duplicate = await post(2024, '  HAAS   CASEBOOK  ').expect(400);
+    expect(duplicate.body.errors.name).toBe('You already have a case book called HAAS CASEBOOK (2024).');
+    await post(null).expect(400);
+    const list = (await a.agent.get('/api/case-books').expect(200)).body.books;
+    expect(list.find((book: { id: number }) => book.id === shared.id)).toEqual(shared);
+    expect(list.filter((book: { user_id: number | null }) => book.user_id === a.id)
+      .map((book: { publication_year: number }) => book.publication_year)).toEqual([2025, 2024]);
+    expect((await b.agent.get('/api/case-books').expect(200)).body.books
+      .some((book: { id: number }) => book.id === old.id || book.id === recent.id)).toBe(false);
+    await b.agent.post('/api/case-books').set('X-CSRF-Token', b.csrfToken)
+      .send({ name: 'Haas Casebook', publication_year: 2024 }).expect(201);
+    const types = (await a.agent.get('/api/question-types').expect(200)).body;
+    for (const [book, date] of [[old, '2025-01-01'], [recent, '2025-01-02']] as const) {
+      const result = await a.agent.post('/api/sessions').set('X-CSRF-Token', a.csrfToken)
+        .send({ question_type_id: types.case[0].id, case_book_id: book.id, session_date: date,
+          prompt: 'Edition case', format: 'solo', overall_score: 4 }).expect(201);
+      expect(result.body.case_book_publication_year).toBe(book.publication_year);
+      expect((await a.agent.get(`/api/sessions/${result.body.id}`).expect(200)).body.case_book_publication_year)
+        .toBe(book.publication_year);
+      const filtered = (await a.agent.get('/api/sessions').query({ book: book.id }).expect(200)).body.sessions;
+      expect(filtered).toHaveLength(1);
+      expect(filtered[0].case_book_publication_year).toBe(book.publication_year);
+    }
+    expect((await a.agent.get('/api/case-books').expect(200)).body.most_recent_case_book_id).toBe(recent.id);
+    const rows = (await a.agent.get('/api/dashboard').expect(200)).body.by_case_book;
+    expect(rows).toHaveLength(2);
+    expect(rows.map((row: { publication_year: number }) => row.publication_year).sort()).toEqual([2024, 2025]);
+    expect(rows.every((row: { count: number }) => row.count === 1)).toBe(true);
+    await seedCaseBooks();
+    expect((await a.agent.get('/api/case-books').expect(200)).body.books.find((book: { id: number }) => book.id === shared.id))
+      .toEqual(shared);
+  });
+
+  it('validates publication years and enforces edition-aware database uniqueness', async () => {
+    const a = await signUp();
+    for (const year of [999, 10000, 2024.5, '2024', 'bad', '']) {
+      const r = await a.agent.post('/api/case-books').set('X-CSRF-Token', a.csrfToken)
+        .send({ name: 'Year validation', publication_year: year }).expect(400);
+      expect(r.body.errors.publication_year).toBe('Please enter a four-digit year, like 2025.');
+    }
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const name = `Shared edition ${randomUUID().slice(0, 8)}`;
+      await client.query('INSERT INTO case_books(name,publication_year) VALUES ($1,2024)', [name]);
+      await client.query('SAVEPOINT invalid');
+      await expect(client.query('INSERT INTO case_books(name,publication_year,user_id) VALUES ($1,2024,$2)',
+        [name.toUpperCase(), a.id])).rejects.toMatchObject({ code: '23505' });
+      await client.query('ROLLBACK TO SAVEPOINT invalid');
+      await client.query('INSERT INTO case_books(name,publication_year,user_id) VALUES ($1,2025,$2)', [name, a.id]);
+      await client.query('SAVEPOINT invalid');
+      await expect(client.query('INSERT INTO case_books(name,publication_year,user_id) VALUES ($1,2025,$2)',
+        [` ${name.toUpperCase()} `, a.id])).rejects.toMatchObject({ code: '23505' });
+      await client.query('ROLLBACK TO SAVEPOINT invalid');
+      await expect(client.query('INSERT INTO case_books(name,publication_year,user_id) VALUES ($1,999,$2)',
+        [name, a.id])).rejects.toMatchObject({ code: '23514' });
+    } finally {
+      await client.query('ROLLBACK');
+      client.release();
+    }
+  });
+
   it('keeps private case books out of other users lists, session writes, and filters', async () => {
     const a = await signUp(), b = await signUp();
     const name = `Private book ${randomUUID().slice(0, 8)}`;
@@ -85,7 +158,7 @@ describe('practice-session data isolation', () => {
     expect((await a.agent.get(`/api/sessions/${own.body.id}`).expect(200)).body.case_book_name).toBe(name);
     expect((await a.agent.get('/api/case-books').expect(200)).body.most_recent_case_book_id).toBe(id);
     expect((await b.agent.get('/api/dashboard').expect(200)).body.by_case_book)
-      .toEqual([{ case_book_id: null, name: 'No book / live case', count: 1, average_score: 3, last_practiced: '2025-01-01' }]);
+      .toEqual([{ case_book_id: null, name: 'No book / live case', publication_year: null, count: 1, average_score: 3, last_practiced: '2025-01-01' }]);
     await b.agent.post('/api/case-books').set('X-CSRF-Token', b.csrfToken).send({ name }).expect(201);
   });
 
@@ -144,7 +217,7 @@ describe('practice-session data isolation', () => {
     expect((await a.agent.get('/api/case-books').expect(200)).body.most_recent_case_book_id).toBeNull();
     const dashboard = (await a.agent.get('/api/dashboard').expect(200)).body;
     expect(dashboard.by_case_book).toHaveLength(3);
-    expect(dashboard.by_case_book[0]).toEqual({ case_book_id: book, name: books[0].name, count: 3,
+    expect(dashboard.by_case_book[0]).toEqual({ case_book_id: book, name: books[0].name, publication_year: null, count: 3,
       average_score: 3, last_practiced: '2025-01-02' });
     const thirds = await create('2024-12-30', 4, book);
     expect((await a.agent.get('/api/dashboard').expect(200)).body.by_case_book[0].average_score).toBe(3.3);

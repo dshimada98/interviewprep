@@ -1,4 +1,5 @@
 import type { DashboardSummary } from '@workspace/api-client-react';
+import { caseBookLabel } from './case-book-label';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 /** Date-only string, parsed by parts so no timezone shift can move the day. */
@@ -19,7 +20,7 @@ export function ByCaseBook({ d, scoreColor }: { d: DashboardSummary; scoreColor:
           const k = r.case_book_id ?? 'none';
           return (
             <li key={k} data-testid={`row-case-book-${k}`} className="flex flex-col gap-1 py-2.5 sm:flex-row sm:items-center sm:gap-4">
-              <span className="min-w-0 flex-1 font-semibold break-words">{r.name}</span>
+              <span className="min-w-0 flex-1 font-semibold break-words">{caseBookLabel(r.name, r.publication_year)}</span>
               <span className="flex items-center gap-3 text-sm">
                 <span className="tabular-nums" data-testid={`text-case-book-count-${k}`}><span className="font-bold">{r.count}</span> {r.count === 1 ? 'case' : 'cases'}</span>
                 <span className="rounded-full px-2.5 py-0.5 text-xs font-bold tabular-nums text-white" style={{ background: scoreColor(r.average_score) }}

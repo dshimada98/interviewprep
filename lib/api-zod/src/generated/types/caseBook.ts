@@ -7,6 +7,8 @@
  */
 
 export interface CaseBook {
+  /** @nullable */
+  publication_year: number | null;
   id: number;
   name: string;
   /** @nullable */
