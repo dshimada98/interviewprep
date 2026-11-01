@@ -259,10 +259,32 @@ paths:
         "404":
           description: Session not found
   /question-types:
+    post:
+      operationId: createQuestionType
+      security: [{sessionCookie: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuestionTypeInput"
+      responses:
+        "201":
+          description: Private behavioral category created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuestionType"
+        "400":
+          description: Invalid or duplicate name
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionValidationError"
     get:
       operationId: getQuestionTypes
       tags: [practice]
-      summary: List shared question types grouped by kind
+      summary: List shared and owned question types grouped by kind
       security:
         - sessionCookie: []
       responses:
@@ -629,9 +651,16 @@ components:
           type: object
           additionalProperties:
             type: string
+    QuestionTypeInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          maxLength: 40
     QuestionType:
       type: object
-      required: [id, name, kind]
+      required: [id, name, kind, user_id]
       properties:
         id:
           type: integer
@@ -640,6 +669,8 @@ components:
         kind:
           type: string
           enum: [case, behavioral]
+        user_id:
+          type: [integer, "null"]
     GroupedQuestionTypes:
       type: object
       required: [case, behavioral]

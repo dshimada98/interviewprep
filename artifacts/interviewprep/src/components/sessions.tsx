@@ -15,6 +15,7 @@ import { sessionRequestOptions, useAuth } from '@/auth';
 import { AppHeader } from './ip';
 import { detailKey, invalidateLists, listKey, removeFromLists, starredKey, statusOf, storyDetailKey } from './session-keys';
 import { StorySelect } from './story-select';
+import { CategorySelect } from './category-select';
 import { ClearFilters, FinderControls, useSessionFinder } from './session-finder';
 import { STAR_ERROR, StarButton, useStarToggle, type StarToggle } from './session-stars';
 import { ScorecardEditor, ScorecardView, draftsFrom, draftsToInput, useCaseSections, type ScoreDrafts } from './scorecard';
@@ -473,6 +474,7 @@ function SessionForm({ initial, submitLabel, busy, onSubmit, cancelHref, serverE
   const [errs, setErrs] = useState<Errs>({});
   const [kind, setKind] = useState<'case' | 'behavioral' | null>(null);
   const [drafts, setDrafts] = useState<ScoreDrafts>(initial.scores ?? {});
+  const [addingType, setAddingType] = useState(false);
   const sections = useCaseSections();
   use401(sections.error);
   const formRef = useRef<HTMLFormElement>(null);
@@ -514,6 +516,7 @@ function SessionForm({ initial, submitLabel, busy, onSubmit, cancelHref, serverE
   function submit(e: FormEvent) {
     e.preventDefault();
     if (busy) return;
+    if (addingType) { focusErrors.current = true; setErrs({ form: 'Save or cancel your new category before saving the session.' }); return; }
     const ids = new Set((types.data?.[activeKind] ?? []).map(t => t.id));
     const [er, input] = validate(v, ids);
     if (!input) { focusErrors.current = true; setErrs(er); return; }
@@ -571,11 +574,11 @@ function SessionForm({ initial, submitLabel, busy, onSubmit, cancelHref, serverE
                 </button>
               </div>
             ) : (
-              <select {...aria('question_type_id', errs.question_type_id)} data-testid="select-question-type" className={inputCls}
-                value={v.question_type_id} onChange={e => set('question_type_id')(e.target.value)}>
-                <option value="">Choose a type</option>
-                 {(types.data?.[activeKind] ?? []).map(t => <option key={t.id} value={String(t.id)}>{t.name}</option>)}
-              </select>
+              <CategorySelect key={activeKind} id="question_type_id" testid="select-question-type" className={inputCls}
+                invalid={!!errs.question_type_id} describedBy={errs.question_type_id ? 'question_type_id-err' : undefined}
+                style={{ borderColor: errs.question_type_id ? '#C0392B' : undefined }}
+                value={v.question_type_id} onChange={set('question_type_id')} placeholder="Choose a type"
+                options={types.data?.[activeKind] ?? []} allowAdd={activeKind === 'behavioral'} disabled={busy} onAddingChange={setAddingType} />
             )}
         </FieldWrap>
       </div>
@@ -650,7 +653,7 @@ function SessionForm({ initial, submitLabel, busy, onSubmit, cancelHref, serverE
 
       <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-2">
         <Link href={cancelHref} data-testid="link-cancel" className="ip-focus min-h-11 px-5 rounded-lg inline-flex items-center justify-center font-semibold border bg-white">Cancel</Link>
-        <button type="submit" disabled={busy} data-testid="button-save-session"
+        <button type="submit" disabled={busy || addingType} data-testid="button-save-session"
           className="ip-focus min-h-11 px-6 rounded-lg font-semibold text-white inline-flex items-center justify-center gap-2 disabled:opacity-70 active:scale-[0.99] transition-transform"
           style={{ background: 'var(--navy)', borderBottom: '3px solid var(--green)' }}>
           {busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}{busy ? 'Saving...' : submitLabel}

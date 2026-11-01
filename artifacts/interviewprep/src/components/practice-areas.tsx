@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { getGetQuestionTypesQueryKey, useGetQuestionTypes } from '@workspace/api-client-react';
 import { useAuth } from '@/auth';
+import { CustomTag } from './category-select';
 
 export function PracticeAreas() {
   const { user, refresh } = useAuth();
@@ -43,7 +44,7 @@ export function PracticeAreas() {
                 <ul className="mt-4 flex flex-wrap gap-2" aria-label={`${kind === 'case' ? 'Case' : 'Behavioral'} question types`}>
                   {data[kind].map(type => (
                     <li key={type.id} className="max-w-full rounded-full border bg-white px-3 py-1.5 text-sm break-words"
-                      style={{ borderColor: 'var(--green)' }}>{type.name}</li>
+                      style={{ borderColor: 'var(--green)' }} data-testid={`chip-practice-area-${type.id}`}>{type.name}{type.user_id != null && <CustomTag />}</li>
                   ))}
                 </ul>
               ) : <p className="mt-4 text-sm text-muted-foreground">No practice areas available yet.</p>}

@@ -11,4 +11,6 @@ export interface QuestionType {
   id: number;
   name: string;
   kind: QuestionTypeKind;
+  /** @nullable */
+  user_id: number | null;
 }

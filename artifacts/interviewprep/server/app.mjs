@@ -6,7 +6,7 @@ import helmet from 'helmet';
 import { rateLimit } from 'express-rate-limit';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { pool } from './db.mjs';
-import { getGroupedQuestionTypes } from './question-types.mjs';
+import { getGroupedQuestionTypes, createQuestionType } from './question-types.mjs';
 import { getCaseSections } from './case-sections.mjs';
 import { practiceSessions } from './practice-sessions.mjs';
 import { getDashboard } from './dashboard.mjs';
@@ -143,9 +143,10 @@ app.get('/api/case-sections', async (_req, res) => {
   res.json(await getCaseSections());
 });
 app.use('/api/sessions', practiceSessions);
-app.get('/api/question-types', async (_req, res) => {
-  res.json(await getGroupedQuestionTypes());
+app.get('/api/question-types', async (req, res) => {
+  res.json(await getGroupedQuestionTypes(req.user.id));
 });
+app.post('/api/question-types', createQuestionType);
 app.post('/api/auth/logout', (req, res, next) => {
   req.session.destroy(err => {
     if (err) return next(err);

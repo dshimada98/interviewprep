@@ -706,19 +706,37 @@ export const DeleteSessionParams = zod.object({
 export const DeleteSessionResponse = zod.void()
 
 
+export const createQuestionTypeBodyNameMax = 40;
+
+
+
+export const CreateQuestionTypeBody = zod.object({
+  "name": zod.string().max(createQuestionTypeBodyNameMax)
+})
+
+export const CreateQuestionTypeResponse = zod.object({
+  "id": zod.number().int(),
+  "name": zod.string(),
+  "kind": zod.enum(['case', 'behavioral']),
+  "user_id": zod.number().int().nullable()
+})
+
+
 /**
- * @summary List shared question types grouped by kind
+ * @summary List shared and owned question types grouped by kind
  */
 export const GetQuestionTypesResponse = zod.object({
   "case": zod.array(zod.object({
   "id": zod.number().int(),
   "name": zod.string(),
-  "kind": zod.enum(['case', 'behavioral'])
+  "kind": zod.enum(['case', 'behavioral']),
+  "user_id": zod.number().int().nullable()
 })),
   "behavioral": zod.array(zod.object({
   "id": zod.number().int(),
   "name": zod.string(),
-  "kind": zod.enum(['case', 'behavioral'])
+  "kind": zod.enum(['case', 'behavioral']),
+  "user_id": zod.number().int().nullable()
 }))
 })
 

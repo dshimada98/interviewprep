@@ -17,21 +17,31 @@ authentication. Behavioral practice sessions may optionally link to an owned sto
 
 ## question_types
 
-Shared reference data: the same rows are available to every logged-in user.
-There is no user ownership column.
+Shared and private categories use the same table: shared types have no owner;
+custom types belong to one user. Custom categories are behavioral only.
 
 | Column | PostgreSQL type | Rules |
 | --- | --- | --- |
 | id | integer (`SERIAL`) | Primary key, automatically assigned |
-| name | text | Required, unique |
+| name | text | Required; normalized uniqueness for shared names and within each owner |
 | kind | text | Required; database check allows only `case` or `behavioral` |
+| user_id | integer, nullable | References users.id, ON DELETE CASCADE; NULL for shared types |
+
+Names are compared ignoring capitalization, leading/trailing whitespace, and
+repeated whitespace. Partial unique indexes enforce shared and per-owner
+uniqueness; a database trigger also rejects shared/private name collisions and
+non-behavioral custom types. Equal names for two different private owners are
+allowed. Custom names must be nonblank and at most 40 characters.
 
 Initial reference rows:
 
 - **Case:** Market Sizing, Profitability, Market Entry, M&A, Growth Strategy,
   Pricing, Operations.
 - **Behavioral:** Leadership, Teamwork, Conflict, Failure / Setback, Impact,
-  Why Consulting.
+  Why Consulting, Tell me about yourself, Why this firm, Influencing without
+  authority, Entrepreneurial drive, Courageous change, Navigating ambiguity,
+  Giving and receiving feedback, Problem solving, Inclusive leadership,
+  Working under pressure, Other.
 
 ## practice_sessions
 
@@ -80,7 +90,7 @@ that the referenced user still exists before allowing protected API access.
 - A user has many practice sessions. Each practice session belongs to one user.
 - A question type has many practice sessions. Each practice session has one
   question type.
-- All users share the question-type reference list.
+- Users see shared question types and only their own private behavioral categories.
 - A user has many stories. Each story belongs to exactly one user.
 - Each story has one main competency: a behavioral question type.
 - A story can be used in many behavioral sessions. A session may use one story or none.
@@ -97,6 +107,7 @@ erDiagram
     question_types ||--o{ practice_sessions : categorizes
     users ||--o{ stories : owns
     question_types ||--o{ stories : main_competency
+    users |o--o{ question_types : owns_custom
     stories |o--o{ practice_sessions : used_in
     practice_sessions ||--o{ section_scores : has
     case_sections ||--o{ section_scores : rates
@@ -110,8 +121,9 @@ erDiagram
     }
     question_types {
         integer id PK
-        text name UK
+        text name
         text kind
+        integer user_id FK
     }
     practice_sessions {
         integer id PK
@@ -171,12 +183,16 @@ erDiagram
    tables/indexes without dropping existing tables or account data.
 2. **Production schema:** When the user chooses to publish, Replit's managed
    Publish process applies the development-to-production schema comparison.
-   Review that comparison to ensure all eight tables and the new `story_id`
-   foreign key exist before serving the updated app. No custom production
+   Review that comparison to ensure all eight tables, `question_types.user_id`,
+   its cascading foreign key, the normalized-name indexes and scope-check
+   function/trigger, and the `story_id` foreign key exist before serving the
+   updated app. The old global `question_types_name_key` constraint is replaced
+   by scoped uniqueness; no existing rows or IDs are changed. No custom production
    migration or startup DDL is used.
 3. **Startup seeding, both environments:** Before opening its listening port,
    `server/index.mjs` calls `seedQuestionTypes()` and `seedCaseSections()`. Parameterized inserts
-   adds missing rows with `ON CONFLICT (name) DO NOTHING`. Existing rows and IDs
+   adds missing shared rows with `ON CONFLICT DO NOTHING`, checking shared rows
+   only. Existing rows and IDs
    are preserved. Repeated or simultaneous startups do not duplicate names.
    This runs against the app's configured database in development and in
    production; production does not depend on copying development table data.
@@ -192,13 +208,17 @@ feature. Production-settings tests use only an isolated development schema.
 
 ```json
 {
-  "case": [{"id": 1, "name": "Growth Strategy", "kind": "case"}],
-  "behavioral": [{"id": 8, "name": "Conflict", "kind": "behavioral"}]
+  "case": [{"id": 1, "name": "Growth Strategy", "kind": "case", "user_id": null}],
+  "behavioral": [{"id": 8, "name": "Conflict", "kind": "behavioral", "user_id": null}]
 }
 ```
 
 The example is abbreviated and IDs are illustrative, not fixed. All question
-types are returned alphabetically within their groups. Unauthenticated requests
+types are scoped to the current user. Behavioral ordering is shared alphabetically,
+then custom alphabetically, with Other last. `POST /api/question-types` accepts
+`{ "name": "Coaching" }`; kind is always behavioral and ownership always comes from
+the authenticated session. Session/story saves and filters reject another user's
+custom category. Unauthenticated requests
 return HTTP 401. The welcome page consumes this API to display the Case and
 Behavioral chips under “Your practice areas,” with loading, retry, and empty
 states rather than hardcoded reference data.
@@ -209,7 +229,8 @@ states rather than hardcoded reference data.
   user-session cascade, protected API access, and production-settings checks.
 - Run `pnpm typecheck` for workspace TypeScript checks.
 - In Preview, log in and confirm the welcome page lists all seven case types
-  and all six behavioral types; refresh and confirm they remain.
+  and all seventeen shared behavioral types plus your custom categories; refresh
+  and confirm they remain.
 - At phone width, chips wrap within the cards without page-wide horizontal
   scrolling. At laptop width the groups appear side by side.
 - Log out and request `/api/question-types`; expect HTTP 401.

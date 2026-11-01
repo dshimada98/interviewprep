@@ -269,6 +269,11 @@ export interface SessionValidationError {
   errors: SessionValidationErrorErrors;
 }
 
+export interface QuestionTypeInput {
+  /** @maxLength 40 */
+  name: string;
+}
+
 export type QuestionTypeKind = typeof QuestionTypeKind[keyof typeof QuestionTypeKind];
 
 
@@ -281,6 +286,8 @@ export interface QuestionType {
   id: number;
   name: string;
   kind: QuestionTypeKind;
+  /** @nullable */
+  user_id: number | null;
 }
 
 export interface GroupedQuestionTypes {

@@ -13,9 +13,38 @@ CREATE INDEX IF NOT EXISTS login_sessions_expire_idx ON login_sessions (expire);
 
 CREATE TABLE IF NOT EXISTS question_types (
   id SERIAL PRIMARY KEY,
-  name TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
   kind TEXT NOT NULL CHECK (kind IN ('case', 'behavioral'))
 );
+ALTER TABLE question_types ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE CASCADE;
+ALTER TABLE question_types DROP CONSTRAINT IF EXISTS question_types_name_key;
+CREATE OR REPLACE FUNCTION category_name_key(value TEXT) RETURNS TEXT
+LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE AS $$
+  SELECT lower(btrim(regexp_replace(value, '[[:space:]]+', ' ', 'g')));
+$$;
+CREATE UNIQUE INDEX IF NOT EXISTS question_types_shared_name_idx
+  ON question_types (category_name_key(name)) WHERE user_id IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS question_types_private_name_idx
+  ON question_types (user_id, category_name_key(name)) WHERE user_id IS NOT NULL;
+CREATE OR REPLACE FUNCTION check_question_type_scope() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  -- Serialize equal normalized names, including shared/private conflicts.
+  PERFORM pg_advisory_xact_lock(hashtextextended(category_name_key(NEW.name), 0));
+  IF NEW.user_id IS NOT NULL AND (NEW.kind <> 'behavioral'
+      OR length(category_name_key(NEW.name)) = 0 OR length(NEW.name) > 40) THEN
+    RAISE EXCEPTION 'Invalid custom category' USING ERRCODE = '23514';
+  END IF;
+  IF EXISTS (SELECT 1 FROM question_types q WHERE q.id <> NEW.id
+      AND category_name_key(q.name) = category_name_key(NEW.name)
+      AND ((NEW.user_id IS NULL AND q.user_id IS NOT NULL)
+        OR (NEW.user_id IS NOT NULL AND q.user_id IS NULL))) THEN
+    RAISE EXCEPTION 'Duplicate category' USING ERRCODE = '23505';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+CREATE OR REPLACE TRIGGER question_types_scope_check BEFORE INSERT OR UPDATE ON question_types
+  FOR EACH ROW EXECUTE FUNCTION check_question_type_scope();
 
 CREATE TABLE IF NOT EXISTS stories (
   id SERIAL PRIMARY KEY,

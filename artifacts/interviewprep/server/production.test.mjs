@@ -49,7 +49,7 @@ if (process.env.PRODUCTION_TEST_CHILD === '1') {
       const areas = await https(request(app).get('/api/question-types'))
         .set('Cookie', signedCookie.split(';')[0]).expect(200);
       assert.equal(areas.body.case.length, 7);
-      assert.equal(areas.body.behavioral.length, 6);
+      assert.equal(areas.body.behavioral.length, 17);
       const sections = await https(request(app).get('/api/case-sections'))
         .set('Cookie', signedCookie.split(';')[0]).expect(200);
       assert.deepEqual(sections.body.map(row => row.name), caseSectionSeeds);

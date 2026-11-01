@@ -174,10 +174,10 @@ export function FinderControls({ f }: { f: SessionFinder }) {
             <select data-testid="select-filter-type" className={selCls} disabled={!grouped}
               value={state.type ?? ''} onChange={e => f.update({ type: e.target.value ? Number(e.target.value) : null })}>
               <option value="">{f.typesError ? 'Types unavailable' : grouped ? 'All types' : 'Loading types'}</option>
-              {typeOpts.length === 1 ? typeOpts[0].list.map(t => <option key={t.id} value={t.id}>{t.name}</option>)
+              {typeOpts.length === 1 ? typeOpts[0].list.map(t => <option key={t.id} value={t.id}>{t.name}{t.user_id != null ? ' (custom)' : ''}</option>)
                 : typeOpts.map(g => (
                   <optgroup key={g.k} label={g.k === 'case' ? 'Case' : 'Behavioral'}>
-                    {g.list.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    {g.list.map(t => <option key={t.id} value={t.id}>{t.name}{t.user_id != null ? ' (custom)' : ''}</option>)}
                   </optgroup>
                 ))}
             </select>
