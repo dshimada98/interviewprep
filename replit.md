@@ -1,10 +1,12 @@
-# [Project name]
+# InterviewPrep
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+InterviewPrep is a consulting case and behavioral interview preparation tracker.
+The workspace setup is complete; no product frontend or authentication feature
+has been implemented as part of setup.
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
+- Use the managed workflow `artifacts/api-server: API Server` to run the API server (port 8080 supplied by the workflow).
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
@@ -18,27 +20,45 @@ _Replace the heading above with the project's name, and this line with one sente
 - DB: PostgreSQL + Drizzle ORM
 - Validation: Zod (`zod/v4`), `drizzle-zod`
 - API codegen: Orval (from OpenAPI spec)
-- Build: esbuild (CJS bundle)
+- Build: esbuild
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `PLAN.md` — full product roadmap; only Feature 1 is currently in build scope.
+- `attached_assets/` — original user briefs.
+- `artifacts/api-server/` — Express scaffold, with the app exported separately from server startup.
+- `artifacts/mockup-sandbox/` — pre-existing design sandbox, not the product frontend.
+- `lib/` — shared database, API specification, generated client, and validation packages.
+- `.migration-backup/` — original files retained by the migration. Root PLAN.md,
+  README.md, and uploaded briefs were restored byte-for-byte.
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- There was no legacy application to port. Setup must not fabricate a website
+  or create domain tables simply to demonstrate migration.
+- Create the actual React product artifact during the separate Feature 1 build;
+  do not place its frontend in the API or mockup-sandbox artifact.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+The separate Feature 1 build is email/password signup, login, logout, and a
+protected welcome page. Later practice tracking, scorecards, stars, dashboard,
+and stories must not be built early.
 
 ## User preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
+- The user manages Git. Do not change branches, merge, or push to main.
+- Use in-app email/password authentication with bcrypt and express-session,
+  not Replit Auth or third-party login.
+- For Feature 1, create only users and the separately approved PostgreSQL
+  login-session storage table. Authentication sessions are not practice sessions.
+- Preserve the user's PLAN.md and README.md unless specifically asked to edit them.
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- Artifact services own their workflows and supply PORT and BASE_PATH.
+  Do not create replacement workflows or run root-level `pnpm dev`.
+- No database schema push was performed during setup.
 
 ## Pointers
 
