@@ -2,10 +2,10 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import {
-  getGetQuestionTypesQueryKey, useCreateQuestionType,
+  createQuestionType, getGetQuestionTypesQueryKey, useCreateQuestionType,
   type GroupedQuestionTypes, type QuestionType,
 } from '@workspace/api-client-react';
-import { sessionRequestOptions, useAuth } from '@/auth';
+import { authRequest, sessionRequestOptions, useAuth } from '@/auth';
 import { statusOf } from './session-keys';
 
 export const ADD_VALUE = '__add_custom__';
@@ -28,10 +28,12 @@ function sortBehavioral(list: QuestionType[]) {
 }
 
 function errMessage(e: unknown) {
-  if (statusOf(e) === 400 && e && typeof e === 'object' && 'data' in e) {
-    const d = (e as { data?: { errors?: Record<string, unknown> } | null }).data;
+  if (e && typeof e === 'object' && 'data' in e) {
+    const d = (e as { data?: { errors?: Record<string, unknown>; message?: unknown } | null }).data;
     const n = d?.errors?.name;
     if (typeof n === 'string' && n) return n;
+    if (statusOf(e) === 401) return 'Please sign in again in another tab, then try saving this category again. Your draft is still here.';
+    if (typeof d?.message === 'string' && d.message) return d.message;
   }
   return GENERIC;
 }
@@ -54,7 +56,23 @@ export function CategorySelect({ id, testid, value, options, placeholder, onChan
   cbRef.current = onAddingChange;
   useEffect(() => { cbRef.current?.(adding); }, [adding]);
   useEffect(() => { if (adding) inputRef.current?.focus(); }, [adding]);
-  const create = useCreateQuestionType({ request: sessionRequestOptions() });
+  const create = useCreateQuestionType({
+    mutation: {
+      mutationFn: async ({ data }) => {
+        // Read the token at click time rather than retaining render-time headers.
+        try {
+          return await createQuestionType(data, sessionRequestOptions());
+        } catch (error) {
+          // A rejected CSRF request has not written anything. Refresh the
+          // session token and retry once; never retry ambiguous network failures.
+          if (statusOf(error) !== 403) throw error;
+          const status = await authRequest('status');
+          if (!status.user) throw error;
+          return createQuestionType(data, sessionRequestOptions());
+        }
+      },
+    },
+  });
 
   function close() { setAdding(false); setName(''); setErr(''); requestAnimationFrame(() => selectRef.current?.focus()); }
 
