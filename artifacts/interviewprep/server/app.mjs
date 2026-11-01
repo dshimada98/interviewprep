@@ -6,6 +6,8 @@ import helmet from 'helmet';
 import { rateLimit } from 'express-rate-limit';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { pool } from './db.mjs';
+import { getGroupedQuestionTypes } from './question-types.mjs';
+import { practiceSessions } from './practice-sessions.mjs';
 
 const production = process.env.NODE_ENV === 'production';
 if (!process.env.SESSION_SECRET) throw new Error('SESSION_SECRET is required. Add it in Replit Secrets.');
@@ -128,6 +130,10 @@ export async function requireAuth(req, res, next) {
 }
 // Register every future API router BELOW this default-deny boundary.
 app.use('/api', requireAuth);
+app.use('/api/sessions', practiceSessions);
+app.get('/api/question-types', async (_req, res) => {
+  res.json(await getGroupedQuestionTypes());
+});
 app.post('/api/auth/logout', (req, res, next) => {
   req.session.destroy(err => {
     if (err) return next(err);

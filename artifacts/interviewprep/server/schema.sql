@@ -10,3 +10,25 @@ CREATE TABLE IF NOT EXISTS login_sessions (
   expire TIMESTAMP(6) NOT NULL
 );
 CREATE INDEX IF NOT EXISTS login_sessions_expire_idx ON login_sessions (expire);
+
+CREATE TABLE IF NOT EXISTS question_types (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  kind TEXT NOT NULL CHECK (kind IN ('case', 'behavioral'))
+);
+
+CREATE TABLE IF NOT EXISTS practice_sessions (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  question_type_id INTEGER NOT NULL REFERENCES question_types(id),
+  session_date DATE NOT NULL,
+  prompt TEXT NOT NULL,
+  format TEXT NOT NULL DEFAULT 'solo' CHECK (format IN ('solo', 'partner', 'mock')),
+  overall_score INTEGER NOT NULL CHECK (overall_score BETWEEN 1 AND 5),
+  duration_minutes INTEGER,
+  went_well TEXT,
+  to_improve TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS practice_sessions_user_id_idx ON practice_sessions (user_id);
+CREATE INDEX IF NOT EXISTS practice_sessions_question_type_id_idx ON practice_sessions (question_type_id);

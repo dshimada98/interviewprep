@@ -13,9 +13,18 @@ if (process.env.PRODUCTION_TEST_CHILD === '1') {
   const { default: request } = await import('supertest');
   const { app, sessionStore } = await import('./app.mjs');
   const { pool } = await import('./db.mjs');
+  const { seedQuestionTypes, questionTypeSeeds } = await import('./question-types.mjs');
   test('fresh provisioned schema: production signup, refresh, logout and login', async () => {
     const https = req => req.set('X-Forwarded-Proto', 'https');
     try {
+      // The same seeder used by startup, with production NODE_ENV and a freshly
+      // provisioned isolated development schema. No live production writes.
+      await seedQuestionTypes();
+      const seeded = (await pool.query('SELECT id, name, kind FROM question_types ORDER BY id')).rows;
+      await Promise.all([seedQuestionTypes(), seedQuestionTypes()]);
+      assert.deepEqual((await pool.query('SELECT id, name, kind FROM question_types ORDER BY id')).rows, seeded);
+      assert.equal(seeded.length, questionTypeSeeds.length);
+      await https(request(app).get('/api/question-types')).expect(401);
       const status = await https(request(app).get('/api/auth/status')).expect(200);
       const firstCookie = status.headers['set-cookie'][0].split(';')[0];
       const email = 'production-settings-test@example.test';
@@ -31,6 +40,10 @@ if (process.env.PRODUCTION_TEST_CHILD === '1') {
         .set('Cookie', signedCookie.split(';')[0]).expect(200);
       assert.equal(refresh.body.user.email, email);
       await https(request(app).get('/api/me')).set('Cookie', signedCookie.split(';')[0]).expect(200);
+      const areas = await https(request(app).get('/api/question-types'))
+        .set('Cookie', signedCookie.split(';')[0]).expect(200);
+      assert.equal(areas.body.case.length, 7);
+      assert.equal(areas.body.behavioral.length, 6);
       const logout = await https(request(app).post('/api/auth/logout'))
         .set('Cookie', signedCookie.split(';')[0]).set('X-CSRF-Token', refresh.body.csrfToken)
         .send({}).expect(200);

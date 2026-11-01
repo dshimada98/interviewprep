@@ -5,9 +5,13 @@ import { createServer as createHttpServer } from 'node:http';
 import express from 'express';
 import { app } from './app.mjs';
 import { pool } from './db.mjs';
+import { seedQuestionTypes } from './question-types.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 await pool.query('SELECT 1');
+// Runs in development AND production after schema provisioning, before traffic.
+// Only missing reference rows are inserted; no startup-time schema changes.
+await seedQuestionTypes();
 const port = Number(process.env.PORT || 5000);
 const server = createHttpServer(app);
 if (process.env.NODE_ENV === 'production') {

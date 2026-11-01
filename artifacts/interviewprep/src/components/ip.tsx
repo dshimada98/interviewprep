@@ -1,7 +1,8 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, Redirect, useLocation } from 'wouter';
-import { Menu, X, LogOut, AlertCircle, Loader2 } from 'lucide-react';
+import { Menu, X, LogOut, AlertCircle, Loader2, ListChecks, ArrowRight } from 'lucide-react';
 import { useAuth, messages } from '@/auth';
+import { PracticeAreas } from './practice-areas';
 
 const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -200,6 +201,7 @@ export function AppHeader() {
       <div className="max-w-5xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between">
         <Link href="/" className="ip-focus min-h-11 inline-flex items-center rounded"><Mark /></Link>
         <div className="hidden sm:flex items-center gap-4">
+          <Link href="/sessions" data-testid="link-nav-sessions" className="ip-focus min-h-11 px-3 rounded-lg inline-flex items-center gap-2 font-semibold hover:bg-white/10"><ListChecks className="h-4 w-4" aria-hidden />Sessions</Link>
           <span className="text-sm text-white/75 truncate max-w-[16rem]">{user?.email}</span>
           {btn}
         </div>
@@ -210,6 +212,7 @@ export function AppHeader() {
       </div>
       {open && (
         <div id="mobile-menu" className="sm:hidden px-5 pb-4 space-y-3 ip-rise">
+          <Link href="/sessions" onClick={() => setOpen(false)} className="ip-focus min-h-11 w-full rounded-lg inline-flex items-center justify-center gap-2 font-semibold border border-white/30"><ListChecks className="h-4 w-4" aria-hidden />Sessions</Link>
           <p className="text-sm text-white/75 break-all">{user?.email}</p>
           <div className="[&>button]:w-full [&>button]:justify-center">{btn}</div>
         </div>
@@ -232,6 +235,11 @@ export function HomePage() {
           <p className="text-sm text-muted-foreground">Signed in as</p>
           <p className="mt-1 text-lg font-semibold break-all">{user?.email}</p>
         </div>
+        <Link href="/sessions" data-testid="link-home-sessions" className="ip-focus ip-rise mt-6 flex items-center justify-between gap-4 min-h-11 rounded-xl p-5 sm:p-6 text-white" style={{ background: 'var(--navy)', borderBottom: '3px solid var(--green)', animationDelay: '160ms' }}>
+          <span><span className="block text-lg font-bold">Practice sessions</span><span className="block text-sm text-white/75">Log a new session or review past practice.</span></span>
+          <ArrowRight className="h-5 w-5 shrink-0" aria-hidden />
+        </Link>
+        <PracticeAreas />
       </main>
     </div>
   );
