@@ -12,7 +12,7 @@ Use the managed `artifacts/interviewprep: web` workflow in Replit Preview. One E
 
 Setup's shared libraries, API scaffold and design sandbox are retained. The unused API scaffold has no public routing paths, so it cannot intercept authentication or expose a public `/api/healthz` endpoint. It is not needed to run the product. Future product API routers belong below the auth boundary in `artifacts/interviewprep/server/app.mjs`, not in the unused scaffold.
 
-Dependencies: Node.js 24, pnpm, Replit PostgreSQL and `SESSION_SECRET`. Run `pnpm install --frozen-lockfile` after checkout. `scripts/post-merge.sh` applies the development-only SQL schema, now including the two Feature 2 tables described in `schema.md`. Schema changes never run during app startup or a production build.
+Dependencies: Node.js 24, pnpm, Replit PostgreSQL and `SESSION_SECRET`. Run `pnpm install --frozen-lockfile` after checkout. `scripts/post-merge.sh` applies the development-only SQL schema, including the approved product tables described in `schema.md`. Schema changes never run during app startup or a production build.
 
 ## Production schema provisioning — required before serving traffic
 
@@ -22,7 +22,7 @@ When you choose to publish later:
 
 1. Complete development setup and verify the development database contains the approved `users` and `login_sessions` tables.
 2. In Publishing, select the Replit-managed production database for this app, with `DATABASE_URL` configured by Replit. Make `SESSION_SECRET` available securely to the production environment.
-3. Review the schema comparison and apply the approved tables before the release serves requests, including Feature 2 tables when publishing that version. Review proposed schema changes rather than copying development account data.
+3. Review the schema comparison and apply all approved tables described in `schema.md` before the release serves requests. Review proposed schema changes rather than copying development account data.
 4. Confirm the production schema has both tables before testing `/api/auth/status`, signup, refresh and logout. Do not test or serve against a blank, unprovisioned database.
 
 No publishing or writes to a production database were performed for this task. The repeatable production-settings test uses a **fresh isolated schema in the development database**, installs the approved schema before traffic, then runs the app with `NODE_ENV=production` and checks signup, secure cookies, refresh, logout invalidation and login. It removes the temporary schema afterward. This tests application behavior, not Replit's actual Publish flow.
@@ -69,7 +69,7 @@ Only `/api/auth/status`, `/api/auth/signup` and `/api/auth/login` are public. Al
 11. Log in with the correct credentials. Expect the welcome page. Log out again.
 12. While logged out, open `/api/me` and `/api/a-future-route`. Both must return HTTP 401 without user data.
 13. Repeat at approximately 375px and laptop width. Check no horizontal scrolling, 44px minimum inputs/buttons, keyboard focus and mobile logout access.
-14. In Replit's development Database pane, verify the four approved tables described in `schema.md`. Verify lowercase emails and bcrypt hashes, not submitted passwords. Do not copy passwords or hashes into chat.
+14. In Replit's development Database pane, verify the approved tables described in `schema.md`. Verify lowercase emails and bcrypt hashes, not submitted passwords. Do not copy passwords or hashes into chat.
 
 New accounts require at least eight characters and at least one special character
 (punctuation or a symbol, such as `!`, `@`, `#`, or `-`). Spaces alone do not

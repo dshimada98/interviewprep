@@ -32,3 +32,20 @@ CREATE TABLE IF NOT EXISTS practice_sessions (
 );
 CREATE INDEX IF NOT EXISTS practice_sessions_user_id_idx ON practice_sessions (user_id);
 CREATE INDEX IF NOT EXISTS practice_sessions_question_type_id_idx ON practice_sessions (question_type_id);
+
+CREATE TABLE IF NOT EXISTS case_sections (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  display_order INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS section_scores (
+  id SERIAL PRIMARY KEY,
+  session_id INTEGER NOT NULL REFERENCES practice_sessions(id) ON DELETE CASCADE,
+  section_id INTEGER NOT NULL REFERENCES case_sections(id),
+  score INTEGER NOT NULL CHECK (score BETWEEN 1 AND 5),
+  went_well TEXT,
+  to_improve TEXT,
+  UNIQUE (session_id, section_id)
+);
+CREATE INDEX IF NOT EXISTS section_scores_section_id_idx ON section_scores (section_id);

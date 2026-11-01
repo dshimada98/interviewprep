@@ -20,11 +20,13 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  CaseSection,
   GetQuestionTypes401,
   GroupedQuestionTypes,
   HealthStatus,
   InvalidSessionResponse,
   PracticeSession,
+  PracticeSessionDetail,
   SessionInput
 } from './api.schemas';
 
@@ -54,6 +56,83 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export const getGetCaseSectionsUrl = () => {
+
+
+
+
+  return `/api/case-sections`
+}
+
+/**
+ * @summary List shared case sections in scorecard order
+ */
+export const getCaseSections = async ( options?: Parameters<typeof customFetch>[1]): Promise<CaseSection[]> => {
+
+  return customFetch<CaseSection[]>(getGetCaseSectionsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCaseSectionsQueryKey = () => {
+    return [
+    `/api/case-sections`
+    ] as const;
+    }
+
+
+export const getGetCaseSectionsQueryOptions = <TData = Awaited<ReturnType<typeof getCaseSections>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCaseSections>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCaseSectionsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCaseSections>>> = ({ signal }) => getCaseSections({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCaseSections>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCaseSectionsQueryResult = NonNullable<Awaited<ReturnType<typeof getCaseSections>>>
+export type GetCaseSectionsQueryError = ErrorType<void>
+
+
+/**
+ * @summary List shared case sections in scorecard order
+ */
+
+export function useGetCaseSections<TData = Awaited<ReturnType<typeof getCaseSections>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCaseSections>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCaseSectionsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getListSessionsUrl = () => {
 
@@ -134,7 +213,7 @@ export const getCreateSessionUrl = () => {
   return `/api/sessions`
 }
 
-export const createSession = async (sessionInput: SessionInput, options?: Parameters<typeof customFetch>[1]): Promise<PracticeSession> => {
+export const createSession = async (sessionInput: SessionInput, options?: Parameters<typeof customFetch>[1]): Promise<PracticeSessionDetail> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -150,7 +229,7 @@ export const createSession = async (sessionInput: SessionInput, options?: Parame
     }
     return headers;
   };
-return customFetch<PracticeSession>(getCreateSessionUrl(),
+return customFetch<PracticeSessionDetail>(getCreateSessionUrl(),
   {
     ...options,
     method: 'POST',
@@ -216,9 +295,9 @@ export const getGetSessionUrl = (id: number,) => {
   return `/api/sessions/${id}`
 }
 
-export const getSession = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<PracticeSession> => {
+export const getSession = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<PracticeSessionDetail> => {
 
-  return customFetch<PracticeSession>(getGetSessionUrl(id),
+  return customFetch<PracticeSessionDetail>(getGetSessionUrl(id),
   {
     ...options,
     method: 'GET'
@@ -288,7 +367,7 @@ export const getUpdateSessionUrl = (id: number,) => {
 }
 
 export const updateSession = async (id: number,
-    sessionInput: SessionInput, options?: Parameters<typeof customFetch>[1]): Promise<PracticeSession> => {
+    sessionInput: SessionInput, options?: Parameters<typeof customFetch>[1]): Promise<PracticeSessionDetail> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -304,7 +383,7 @@ export const updateSession = async (id: number,
     }
     return headers;
   };
-return customFetch<PracticeSession>(getUpdateSessionUrl(id),
+return customFetch<PracticeSessionDetail>(getUpdateSessionUrl(id),
   {
     ...options,
     method: 'PUT',

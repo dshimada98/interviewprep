@@ -5,6 +5,41 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+export interface CaseSection {
+  id: number;
+  name: string;
+  display_order: number;
+}
+
+export interface SectionScoreInput {
+  /**
+     * @minimum 1
+     * @maximum 2147483647
+     */
+  section_id: number;
+  /**
+     * @minimum 1
+     * @maximum 5
+     */
+  score: number;
+  /**
+     * @maxLength 4000
+     * @nullable
+     */
+  went_well?: string | null;
+  /**
+     * @maxLength 4000
+     * @nullable
+     */
+  to_improve?: string | null;
+}
+
+export type SectionScore = SectionScoreInput & {
+  id: number;
+  section_name: string;
+  display_order: number;
+};
+
 export type SessionInputFormat = typeof SessionInputFormat[keyof typeof SessionInputFormat];
 
 
@@ -15,6 +50,11 @@ export const SessionInputFormat = {
 } as const;
 
 export interface SessionInput {
+  /**
+     * Scored sections only; omit N/A sections. Empty or omitted replaces all scores with none. Ignored for behavioral sessions.
+     * @maxItems 7
+     */
+  section_scores?: SectionScoreInput[];
   /** @pattern ^\d{4}-\d{2}-\d{2}$ */
   session_date: string;
   /**
@@ -64,6 +104,10 @@ export type PracticeSession = SessionInput & {
   question_type_name: string;
   kind: PracticeSessionKind;
   created_at: string;
+};
+
+export type PracticeSessionDetail = PracticeSession & {
+  section_scores: SectionScore[];
 };
 
 export type SessionValidationErrorErrors = {[key: string]: string};

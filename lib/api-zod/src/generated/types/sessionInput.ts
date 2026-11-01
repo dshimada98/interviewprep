@@ -5,9 +5,15 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { SectionScoreInput } from './sectionScoreInput';
 import type { SessionInputFormat } from './sessionInputFormat';
 
 export interface SessionInput {
+  /**
+     * Scored sections only; omit N/A sections. Empty or omitted replaces all scores with none. Ignored for behavioral sessions.
+     * @maxItems 7
+     */
+  section_scores?: SectionScoreInput[];
   /** @pattern ^\d{4}-\d{2}-\d{2}$ */
   session_date: string;
   /**

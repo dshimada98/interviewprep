@@ -13,7 +13,7 @@ Use custom in-app email/password authentication, not Replit Auth or third-party 
 
 **Why:** The brief requires PostgreSQL-backed express-session, and the user explicitly approved the additional session table when asked.
 
-**How to apply:** Distinguish authentication sessions from the out-of-scope interview practice sessions; do not use the exception to add unrelated tables.
+**How to apply:** Distinguish login-session infrastructure from practice-session product data. Additional product tables require an explicit feature request, not the infrastructure exception.
 
 Do not change Git branches, merge, or push to main.
 

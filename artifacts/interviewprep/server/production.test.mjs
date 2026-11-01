@@ -14,12 +14,18 @@ if (process.env.PRODUCTION_TEST_CHILD === '1') {
   const { app, sessionStore } = await import('./app.mjs');
   const { pool } = await import('./db.mjs');
   const { seedQuestionTypes, questionTypeSeeds } = await import('./question-types.mjs');
+  const { seedCaseSections, caseSectionSeeds } = await import('./case-sections.mjs');
   test('fresh provisioned schema: production signup, refresh, logout and login', async () => {
     const https = req => req.set('X-Forwarded-Proto', 'https');
     try {
       // The same seeder used by startup, with production NODE_ENV and a freshly
       // provisioned isolated development schema. No live production writes.
       await seedQuestionTypes();
+      await seedCaseSections();
+      const caseSeeded = (await pool.query('SELECT id, name, display_order FROM case_sections ORDER BY display_order')).rows;
+      await Promise.all([seedCaseSections(), seedCaseSections()]);
+      assert.deepEqual((await pool.query('SELECT id, name, display_order FROM case_sections ORDER BY display_order')).rows, caseSeeded);
+      assert.deepEqual(caseSeeded.map(row => row.name), caseSectionSeeds);
       const seeded = (await pool.query('SELECT id, name, kind FROM question_types ORDER BY id')).rows;
       await Promise.all([seedQuestionTypes(), seedQuestionTypes()]);
       assert.deepEqual((await pool.query('SELECT id, name, kind FROM question_types ORDER BY id')).rows, seeded);
@@ -44,6 +50,9 @@ if (process.env.PRODUCTION_TEST_CHILD === '1') {
         .set('Cookie', signedCookie.split(';')[0]).expect(200);
       assert.equal(areas.body.case.length, 7);
       assert.equal(areas.body.behavioral.length, 6);
+      const sections = await https(request(app).get('/api/case-sections'))
+        .set('Cookie', signedCookie.split(';')[0]).expect(200);
+      assert.deepEqual(sections.body.map(row => row.name), caseSectionSeeds);
       const logout = await https(request(app).post('/api/auth/logout'))
         .set('Cookie', signedCookie.split(';')[0]).set('X-CSRF-Token', refresh.body.csrfToken)
         .send({}).expect(200);

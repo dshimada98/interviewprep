@@ -1,10 +1,11 @@
-# InterviewPrep database schema — Features 1–3
+# InterviewPrep database schema — Features 1–4
 
 The application's SQL source of truth is
-`artifacts/interviewprep/server/schema.sql`. There are three product tables
-(`users`, `question_types`, and `practice_sessions`) plus the existing technical
-`login_sessions` table used for authentication. No story, scorecard, or star
-tables exist, and `practice_sessions` has no `story_id` column.
+`artifacts/interviewprep/server/schema.sql`. There are five product tables
+(`users`, `question_types`, `practice_sessions`, `case_sections`, and
+`section_scores`) plus the existing technical `login_sessions` table used for
+authentication. No story or star tables exist, and `practice_sessions` has no
+`story_id` column.
 
 ## users
 
@@ -87,6 +88,8 @@ that the referenced user still exists before allowing protected API access.
 erDiagram
     users ||--o{ practice_sessions : owns
     question_types ||--o{ practice_sessions : categorizes
+    practice_sessions ||--o{ section_scores : has
+    case_sections ||--o{ section_scores : rates
     users {
         integer id PK
         text email UK
@@ -111,6 +114,19 @@ erDiagram
         text to_improve
         timestamptz created_at
     }
+    case_sections {
+        integer id PK
+        text name UK
+        integer display_order
+    }
+    section_scores {
+        integer id PK
+        integer session_id FK
+        integer section_id FK
+        integer score
+        text went_well
+        text to_improve
+    }
     login_sessions {
         varchar sid PK
         json sess
@@ -125,10 +141,10 @@ erDiagram
    tables/indexes without dropping existing tables or account data.
 2. **Production schema:** When the user chooses to publish, Replit's managed
    Publish process applies the development-to-production schema comparison.
-   Review that comparison to ensure all four tables exist before serving the
+   Review that comparison to ensure all six tables exist before serving the
    updated app. No custom production migration or startup DDL is used.
 3. **Startup seeding, both environments:** Before opening its listening port,
-   `server/index.mjs` calls `seedQuestionTypes()`. A single parameterized insert
+   `server/index.mjs` calls `seedQuestionTypes()` and `seedCaseSections()`. Parameterized inserts
    adds missing rows with `ON CONFLICT (name) DO NOTHING`. Existing rows and IDs
    are preserved. Repeated or simultaneous startups do not duplicate names.
    This runs against the app's configured database in development and in
@@ -220,7 +236,7 @@ Protected frontend routes:
 `pnpm test` includes real-database session CRUD, invalid input, CSRF, date
 round-trip, deletion persistence, and two-user isolation tests. Browser checks
 should cover create → reload → edit → reload → cancel deletion → confirm
-deletion, and check phone/laptop layouts. No scorecards, stars, dashboard, or
+deletion, and check phone/laptop layouts. No stars, dashboard, or
 story features are included.
 
 The root `npm test` script also runs Vitest with Supertest against the exported
@@ -238,3 +254,91 @@ switching kinds. For Feature 3, save failures show only
 “Couldn't save. Please check your entries.” Server-side input checks remain in
 place for security and data integrity; detailed per-field UI messages are
 deferred to Feature 5.
+
+## Case scorecard (Feature 4)
+
+### case_sections — shared reference data
+
+| Column | PostgreSQL type | Rules |
+| --- | --- | --- |
+| id | integer (`SERIAL`) | Primary key, automatically assigned |
+| name | text | Required, unique |
+| display_order | integer | Required; determines scorecard order |
+
+Startup inserts only missing names in both development and production, preserving
+existing rows and IDs. The seven initial rows are:
+
+1. Introduction
+2. Framework
+3. Exhibits
+4. Math
+5. Brainstorm
+6. Recommendation
+7. Driving the case forward
+
+`GET /api/case-sections` requires login and returns `id`, `name`, and
+`display_order`, sorted by `display_order`. These rows are shared by all users.
+
+### section_scores — private through the parent session
+
+| Column | PostgreSQL type | Rules |
+| --- | --- | --- |
+| id | integer (`SERIAL`) | Primary key, automatically assigned |
+| session_id | integer | Required foreign key to `practice_sessions.id`, `ON DELETE CASCADE` |
+| section_id | integer | Required foreign key to `case_sections.id` |
+| score | integer | Required; database check restricts to 1–5 |
+| went_well | text | Optional section-level notes |
+| to_improve | text | Optional section-level notes |
+
+**A practice session has many section scores, at most one per case section.**
+The database enforces a unique `(session_id, section_id)` pair. A case section
+may be referenced by many practice sessions. **N/A means no row**, not a null
+score or a score of zero. Deleting a practice session automatically deletes its
+scores. Deleting a user cascades through their sessions to their scores.
+
+There are no independent section-score CRUD endpoints. Every private read or
+write goes through an owned parent session. Foreign and nonexistent sessions
+both return 404 `Session not found`.
+
+### Atomic create and edit
+
+POST and PUT accept an optional `section_scores` array:
+
+```json
+{
+  "section_scores": [
+    {"section_id": 1, "score": 4, "went_well": "Clear opening", "to_improve": null}
+  ]
+}
+```
+
+The ID is illustrative. The rest of the normal session fields are still
+required. The client sends only scored sections; N/A sections are omitted.
+
+The server opens one transaction, validates input and reference IDs, writes the
+parent, deletes that session's old section scores, and inserts its currently
+scored sections. It commits only after all steps succeed. A failure restores
+the original parent and all old scores; partial cards are never committed.
+Editing locks the owned parent row first, so concurrent edits cannot interleave
+their replacements. The unique constraint provides a second defense against
+duplicate sections.
+
+An empty or omitted array replaces the card with all N/A. Changing the question
+type to Behavioral always clears its section scores, even if the request still
+contains old scored sections.
+
+GET `/api/sessions/:id`, POST, and PUT return `section_scores`, sorted by section
+`display_order`. Each scored row includes `id`, `section_id`, `score`, notes,
+`section_name`, and `display_order`. The detail read uses one ownership-scoped
+SQL statement for a consistent snapshot. The list remains a lightweight summary.
+
+The form shows the seven-row scorecard only for Case sessions. Notes expand on
+request and start expanded when editing a section with saved notes. Detail
+shows a desktop table or phone cards, including gray N/A sections. Scores and
+notes use the same Save action as the session, not separate requests.
+
+`npm test` covers ordered/idempotent production-settings seeding, direct DB
+constraints, parent ownership, invalid scorecards, real rollback after a failed
+child insertion, repeated and concurrent replacement, N/A removal,
+Case-to-Behavioral cleanup, and parent-deletion cascade. The original root
+Vitest data-isolation test continues to run unchanged.

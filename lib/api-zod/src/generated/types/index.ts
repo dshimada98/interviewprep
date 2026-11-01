@@ -6,14 +6,18 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './caseSection';
 export * from './getQuestionTypes401';
 export * from './groupedQuestionTypes';
 export * from './healthStatus';
 export * from './invalidSessionResponse';
 export * from './practiceSession';
+export * from './practiceSessionDetail';
 export * from './practiceSessionKind';
 export * from './questionType';
 export * from './questionTypeKind';
+export * from './sectionScore';
+export * from './sectionScoreInput';
 export * from './sessionInput';
 export * from './sessionInputFormat';
 export * from './sessionValidationError';

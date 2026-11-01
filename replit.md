@@ -1,9 +1,9 @@
 # InterviewPrep
 
 InterviewPrep is a consulting case and behavioral interview preparation tracker.
-Features 1–3 cover custom email/password authentication, shared practice areas,
-and private practice-session logging, detail, editing, and confirmed deletion.
-Later scorecard, star, dashboard, and story features are not included.
+Features 1–4 cover custom email/password authentication, shared practice areas,
+private session CRUD, and the seven-section case scorecard.
+Later validation-message, star, search, dashboard, and story features are not included.
 
 ## Run & Operate
 
@@ -65,9 +65,10 @@ page, and session CRUD. Build later features only when explicitly requested.
 - Artifact services own their workflows and supply PORT and BASE_PATH.
   Do not create replacement workflows or run root-level `pnpm dev`.
 - The SQL source of truth is `artifacts/interviewprep/server/schema.sql`.
-  Current tables are `users`, `login_sessions`, `question_types`, and
-  `practice_sessions`. Never run the empty scaffold's Drizzle push over them.
-- Startup seeds only missing shared question types in both development and
+  Current tables are `users`, `login_sessions`, `question_types`,
+  `practice_sessions`, `case_sections`, and `section_scores`.
+  Never run the empty scaffold's Drizzle push over them.
+- Startup seeds only missing shared question types and case sections in both development and
   production, after schema provisioning. No startup DDL or production migration
   hooks. Story links and other later-feature tables remain out of scope.
 - Every future API router goes below the shared `requireAuth` boundary in the product's `server/app.mjs`. Mutations require its session-bound CSRF token.
