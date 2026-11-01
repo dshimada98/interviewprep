@@ -1,4 +1,5 @@
 import { z } from 'zod/v4';
+import { visibleCaseBook } from './case-books.mjs';
 
 const messages = {
   date: 'Please pick the date of your session.',
@@ -30,6 +31,7 @@ const input = z.object({
   went_well: notes,
   to_improve: notes,
   story_id: integer(1, 2147483647, 'Please choose one of your stories.').nullable().optional(),
+  case_book_id: integer(1, 2147483647, 'Please choose a case book.').nullable().optional(),
   section_scores: z.array(z.object({
     section_id: integer(1, 2147483647, messages.section),
     score: integer(1, 5, messages.section),
@@ -69,6 +71,10 @@ export async function validateSession(body, database, userId) {
     }
   }
   const story = input.shape.story_id.safeParse(body?.story_id);
+  const book = input.shape.case_book_id.safeParse(body?.case_book_id);
+  if (book.success && book.data != null && !await visibleCaseBook(database, book.data, userId)) {
+    errors.case_book_id = 'Please choose a case book.';
+  }
   if (story.success && story.data != null) {
     // Hold a key-share lock until this session transaction commits, preventing
     // a concurrent deletion from turning a validated link into a dangling FK.
@@ -82,7 +88,8 @@ export async function validateSession(body, database, userId) {
   return {
     values: [data.question_type_id, data.session_date, data.prompt, data.format,
       data.overall_score, data.duration_minutes ?? null, data.went_well || null, data.to_improve || null,
-      kind === 'behavioral' ? data.story_id ?? null : null],
+      kind === 'behavioral' ? data.story_id ?? null : null,
+      kind === 'case' ? data.case_book_id ?? null : null],
     scores: data.section_scores,
   };
 }

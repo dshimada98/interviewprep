@@ -1,9 +1,9 @@
-# InterviewPrep database schema — Features 1–10
+# InterviewPrep database schema — Features 1–12
 
 The application's SQL source of truth is
-`artifacts/interviewprep/server/schema.sql`. There are seven product tables
+`artifacts/interviewprep/server/schema.sql`. There are eight product tables
 (`users`, `question_types`, `practice_sessions`, `case_sections`, and
-`section_scores`, `stars`, and `stories`) plus the existing technical `login_sessions` table used for
+`section_scores`, `stars`, `stories`, and `case_books`) plus the existing technical `login_sessions` table used for
 authentication. Behavioral practice sessions may optionally link to an owned story.
 
 ## users
@@ -43,6 +43,35 @@ Initial reference rows:
   Giving and receiving feedback, Problem solving, Inclusive leadership,
   Working under pressure, Other.
 
+## case_books
+
+Shared books have no owner; custom books belong to one user. A case book has many
+case sessions, while a case session has one book or none.
+
+| Column | PostgreSQL type | Rules |
+| --- | --- | --- |
+| id | integer (`SERIAL`) | Primary key |
+| name | text | Required, nonblank, at most 60 characters |
+| user_id | integer, nullable | References users.id, ON DELETE CASCADE; NULL means shared |
+| created_at | timestamp with time zone | Required, defaults to now() |
+
+Partial unique indexes and a scope-check trigger enforce case-insensitive,
+whitespace-normalized uniqueness against shared names and the user's own books.
+Different private owners may use the same name. Server identity—not submitted
+`user_id`—determines ownership. Lists, saves, and filters enforce visibility.
+
+Shared seeds: Case in Point, Victor Cheng (Case Interview Secrets), Haas Casebook,
+Wharton Casebook, Kellogg Casebook, Columbia Casebook, Darden Casebook, Tuck
+Casebook, Ross Casebook, Fuqua Casebook, MIT Sloan Casebook, Stern Casebook,
+Firm website practice cases.
+
+`GET /api/case-books` returns `{ books, most_recent_case_book_id }`: shared books
+alphabetically, then the user's private books alphabetically. The most recent
+case is ordered by session date, creation timestamp, then ID descending. Its book
+ID (including NULL for a live case) defaults only the new-session form; editing
+keeps the saved book, and refetching never overwrites a user's draft choice.
+`POST /api/case-books` accepts `{ name }` and creates a private book.
+
 ## practice_sessions
 
 Each practice session belongs to exactly one user. Feature 3 uses this existing
@@ -55,6 +84,7 @@ Feature 10 adds an optional story link without replacing existing session data.
 | user_id | integer | Required foreign key to `users.id`; `ON DELETE CASCADE` |
 | question_type_id | integer | Required foreign key to `question_types.id` |
 | story_id | integer, nullable | Foreign key to `stories.id`, `ON DELETE SET NULL`; only an owned story on a behavioral session |
+| case_book_id | integer, nullable | Foreign key to case_books.id, ON DELETE SET NULL; shared or owned book on a case session only |
 | session_date | date | Required calendar date, no time of day |
 | prompt | text | Required |
 | format | text | Required, defaults to `solo`; database check allows `solo`, `partner`, or `mock` |
@@ -65,9 +95,17 @@ Feature 10 adds an optional story link without replacing existing session data.
 | created_at | timestamp with time zone | Required, defaults to `now()` |
 
 The database enforces required values, valid kinds/formats, score range, integer
-types, and foreign keys, regardless of which client submits data. Both foreign
-key columns have indexes. Deleting a user deletes their practice sessions;
+types, and foreign keys, regardless of which client submits data. Session owner,
+type, story, and book references are indexed. Deleting a user deletes their practice sessions;
 deleting a question type that is referenced by a session is rejected.
+Deleting a case book clears its links, preserving sessions, scores, and stars.
+Switching a session to behavioral clears the book. A NULL book means
+"No book / live case". Omitted/null `case_book_id` on an update clears the link.
+List/detail responses include `case_book_name`. `GET /api/sessions?book=<id>`
+filters by a visible book; `book=none` returns only case sessions without books.
+The dashboard's `by_case_book` groups owned case sessions by book (including
+NULL), with count, one-decimal average score, and last practiced date, ordered
+by count descending. It is empty when there are no case sessions.
 
 ## login_sessions (existing authentication infrastructure)
 
@@ -88,6 +126,8 @@ that the referenced user still exists before allowing protected API access.
 ## Relationships in plain English
 
 - A user has many practice sessions. Each practice session belongs to one user.
+- A case book has many case sessions; shared books have no owner, custom books belong to one user.
+- A session may use one case book or none; deleting a book never deletes its sessions.
 - A question type has many practice sessions. Each practice session has one
   question type.
 - Users see shared question types and only their own private behavioral categories.
@@ -104,6 +144,8 @@ that the referenced user still exists before allowing protected API access.
 ```mermaid
 erDiagram
     users ||--o{ practice_sessions : owns
+    users |o--o{ case_books : owns_custom
+    case_books |o--o{ practice_sessions : sourced_from
     question_types ||--o{ practice_sessions : categorizes
     users ||--o{ stories : owns
     question_types ||--o{ stories : main_competency
@@ -130,6 +172,7 @@ erDiagram
         integer user_id FK
         integer question_type_id FK
         integer story_id FK
+        integer case_book_id FK
         date session_date
         text prompt
         text format
@@ -137,6 +180,12 @@ erDiagram
         integer duration_minutes
         text went_well
         text to_improve
+        timestamptz created_at
+    }
+    case_books {
+        integer id PK
+        text name
+        integer user_id FK
         timestamptz created_at
     }
     case_sections {
@@ -183,14 +232,16 @@ erDiagram
    tables/indexes without dropping existing tables or account data.
 2. **Production schema:** When the user chooses to publish, Replit's managed
    Publish process applies the development-to-production schema comparison.
-   Review that comparison to ensure all eight tables, `question_types.user_id`,
+    Review that comparison to ensure all nine tables, `question_types.user_id`,
    its cascading foreign key, the normalized-name indexes and scope-check
-   function/trigger, and the `story_id` foreign key exist before serving the
+   function/trigger, case-book normalized-name indexes and scope-check trigger,
+   and the `story_id` and `case_book_id` foreign keys exist before serving the
    updated app. The old global `question_types_name_key` constraint is replaced
    by scoped uniqueness; no existing rows or IDs are changed. No custom production
    migration or startup DDL is used.
 3. **Startup seeding, both environments:** Before opening its listening port,
-   `server/index.mjs` calls `seedQuestionTypes()` and `seedCaseSections()`. Parameterized inserts
+   `server/index.mjs` calls `seedQuestionTypes()`, `seedCaseSections()`, and
+   `seedCaseBooks()`. Parameterized inserts
    adds missing shared rows with `ON CONFLICT DO NOTHING`, checking shared rows
    only. Existing rows and IDs
    are preserved. Repeated or simultaneous startups do not duplicate names.

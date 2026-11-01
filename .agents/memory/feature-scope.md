@@ -32,3 +32,13 @@ A story has one main behavioral competency, but the session dropdown includes al
 **Why:** The story-bank brief explicitly requests all owned stories ordered with matches first, and excludes multi-competency tags.
 
 **How to apply:** Do not restrict links to stories whose competency equals the session's question type. Ownership and behavioral session kind are required; matching only affects ordering.
+
+Use the most recent case session's book as a convenience default for new case
+sessions, including an empty book. Never let that default replace an edit's saved
+value or a choice the user already made in the current draft.
+
+**Why:** The user said, “I usually work through one book at a time.”
+
+**How to apply:** Preserve this workflow when changing form initialization,
+query refreshes, or the case-book selector; “No book / live case” is an intentional
+choice, not missing data to replace with an older book.

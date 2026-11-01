@@ -10,6 +10,13 @@ import type { SessionInputFormat } from './sessionInputFormat';
 
 export interface SessionInput {
   /**
+     * Optional shared or owned case book. Omitted/null clears the link; behavioral sessions always clear it.
+     * @minimum 1
+     * @maximum 2147483647
+     * @nullable
+     */
+  case_book_id?: number | null;
+  /**
      * Optional owned story for behavioral sessions. Omitted/null clears the link; a case session always clears it.
      * @minimum 1
      * @maximum 2147483647

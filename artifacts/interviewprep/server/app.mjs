@@ -11,6 +11,7 @@ import { getCaseSections } from './case-sections.mjs';
 import { practiceSessions } from './practice-sessions.mjs';
 import { getDashboard } from './dashboard.mjs';
 import { stories } from './stories.mjs';
+import { caseBooks } from './case-books.mjs';
 
 const production = process.env.NODE_ENV === 'production';
 if (!process.env.SESSION_SECRET) throw new Error('SESSION_SECRET is required. Add it in Replit Secrets.');
@@ -136,6 +137,7 @@ export async function requireAuth(req, res, next) {
 // Register every future API router BELOW this default-deny boundary.
 app.use('/api', requireAuth);
 app.use('/api/stories', stories);
+app.use('/api/case-books', caseBooks);
 app.get('/api/dashboard', async (req, res) => {
   res.json(await getDashboard(req.user.id));
 });

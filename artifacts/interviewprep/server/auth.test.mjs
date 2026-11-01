@@ -124,7 +124,7 @@ test('real PostgreSQL authentication lifecycle and validation', async t => {
     });
     await t.test('only approved tables exist', async () => {
       const tables = (await pool.query("SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY tablename")).rows;
-      assert.deepEqual(tables.map(r => r.tablename), ['case_sections', 'login_sessions', 'practice_sessions', 'question_types', 'section_scores', 'stars', 'stories', 'users']);
+      assert.deepEqual(tables.map(r => r.tablename), ['case_books', 'case_sections', 'login_sessions', 'practice_sessions', 'question_types', 'section_scores', 'stars', 'stories', 'users']);
     });
   } finally {
     await pool.query("DELETE FROM login_sessions WHERE sess->>'csrfToken'=ANY($1::text[]) OR (sess->>'userId')::int=ANY($2::int[])", [tokens, ids]);

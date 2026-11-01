@@ -1,3 +1,3 @@
 - [Feature scope and ownership](feature-scope.md) — incremental scope, custom auth, session-table exception, story competency semantics, and user-managed Git.
-- [Browser testing on Nix](browser-environment.md) — use system Chromium; downloaded browser bundles lack expected shared libraries in this environment.
+- [Browser testing constraints](browser-environment.md) — use system Chromium and populated heatmap fixtures when checking mobile overflow.
 - [Delegated runtime changes](delegated-runtime-changes.md) — inspect runtime configuration after frontend delegation; helpers can introduce unneeded toolchains.

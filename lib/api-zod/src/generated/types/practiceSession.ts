@@ -10,6 +10,10 @@ import type { SessionInput } from './sessionInput';
 
 export type PracticeSession = SessionInput & ({
   /** @nullable */
+  case_book_id: number | null;
+  /** @nullable */
+  case_book_name: string | null;
+  /** @nullable */
   story_id: number | null;
   /** @nullable */
   story_title: string | null;

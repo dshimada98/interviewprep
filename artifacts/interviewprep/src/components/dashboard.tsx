@@ -7,6 +7,7 @@ import { useAuth, sessionRequestOptions } from '@/auth';
 import { AppHeader } from './ip';
 import { PracticeAreas } from './practice-areas';
 import { NextCaseFocus } from './next-case-focus';
+import { ByCaseBook } from './case-book-panel';
 import { dashboardKey, statusOf } from './session-keys';
 
 /** Band thresholds match the scorecard scale: below 3 red (1-2), 3 to below 4 amber (3), 4+ green (4-5). */
@@ -130,7 +131,8 @@ function Heatmap({ d }: { d: DashboardSummary }) {
         <p className="text-sm text-muted-foreground" data-testid="text-heatmap-empty">Log a case session to start the heatmap.</p>
       ) : (
         <>
-          <div className="max-w-full overflow-x-auto rounded-lg bg-white" data-testid="scroll-heatmap">
+          <div className="w-full min-w-0 max-w-full overflow-x-auto rounded-lg bg-white"
+            style={{ contain: 'inline-size layout paint' }} data-testid="scroll-heatmap">
             <table className="border-separate border-spacing-1 text-sm">
               <caption className="sr-only">Section scores for your {cols.length} most recent case sessions, oldest first. Blank cells are N/A.</caption>
               <thead>
@@ -231,6 +233,7 @@ export function DashboardPage() {
           <div className="space-y-5">
             <Stats d={d} />
             <CasesByType d={d} />
+            <ByCaseBook d={d} scoreColor={bandColor} />
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
               <SectionChart d={d} />
               <Heatmap d={d} />

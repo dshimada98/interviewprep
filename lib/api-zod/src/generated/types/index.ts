@@ -6,7 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './caseBook';
+export * from './caseBookInput';
+export * from './caseBookList';
 export * from './caseSection';
+export * from './dashboardCaseBook';
 export * from './dashboardCaseType';
 export * from './dashboardHeatmapSession';
 export * from './dashboardSectionAverage';

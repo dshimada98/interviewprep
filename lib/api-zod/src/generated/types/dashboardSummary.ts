@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { DashboardCaseBook } from './dashboardCaseBook';
 import type { DashboardCaseType } from './dashboardCaseType';
 import type { DashboardHeatmapSession } from './dashboardHeatmapSession';
 import type { DashboardSectionAverage } from './dashboardSectionAverage';
@@ -12,6 +13,7 @@ import type { DashboardWeakestType } from './dashboardWeakestType';
 import type { NextCaseFocusSection } from './nextCaseFocusSection';
 
 export interface DashboardSummary {
+  by_case_book: DashboardCaseBook[];
   /** @maxItems 2 */
   next_case_focus: NextCaseFocusSection[];
   total_cases: number;

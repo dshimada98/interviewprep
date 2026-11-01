@@ -1,6 +1,6 @@
 import type { Query, QueryClient } from '@tanstack/react-query';
 import {
-  getGetDashboardQueryKey, getGetSessionQueryKey, getGetStoryQueryKey, getListSessionsQueryKey, getListStoriesQueryKey,
+  getGetCaseBooksQueryKey, getGetDashboardQueryKey, getGetSessionQueryKey, getGetStoryQueryKey, getListSessionsQueryKey, getListStoriesQueryKey,
   type ListSessionsParams, type SessionList,
 } from '@workspace/api-client-react';
 
@@ -25,12 +25,16 @@ export const isListQuery = (uid?: number) => (q: Query) => {
 export const paramsOfKey = (k: readonly unknown[]): ListSessionsParams => (k.length === 3 ? (k[1] as ListSessionsParams) : {});
 
 export const dashboardKey = (uid?: number) => [...getGetDashboardQueryKey(), uid] as const;
+/** Case books plus the user's most recent case book (changes whenever sessions are written). */
+export const caseBooksKey = (uid?: number) => [...getGetCaseBooksQueryKey(), uid] as const;
 /** Session create/edit/delete changes list results and dashboard aggregates. Star toggles do not touch the dashboard. */
 export const invalidateLists = (qc: QueryClient, uid?: number, opts: { dashboard?: boolean; stories?: boolean } = {}) => Promise.all([
   qc.invalidateQueries({ predicate: isListQuery(uid) }),
   // Story stats come from linked sessions; star toggles (dashboard: false) never change them.
   (opts.stories ?? opts.dashboard !== false) ? qc.invalidateQueries({ predicate: isStoryQuery(uid) }) : undefined,
   opts.dashboard === false ? undefined : qc.invalidateQueries({ queryKey: dashboardKey(uid), exact: true }),
+  // The "most recent case book" default must reflect the latest session write.
+  opts.dashboard === false ? undefined : qc.invalidateQueries({ queryKey: caseBooksKey(uid), exact: true }),
 ]);
 
 /** Remove a deleted session from every cached envelope for the user. */
