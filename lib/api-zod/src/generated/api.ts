@@ -9,6 +9,41 @@ import * as zod from 'zod';
 
 
 /**
+ * @summary Private practice dashboard computed from owned sessions
+ */
+export const GetDashboardResponse = zod.object({
+  "total_cases": zod.number().int(),
+  "average_case_score": zod.number().nullable(),
+  "weakest_case_type": zod.object({
+  "name": zod.string(),
+  "average_score": zod.number()
+}).nullable(),
+  "behavioral_sessions": zod.number().int(),
+  "cases_by_type": zod.array(zod.object({
+  "id": zod.number().int(),
+  "name": zod.string(),
+  "count": zod.number().int()
+})),
+  "section_averages": zod.array(zod.object({
+  "id": zod.number().int(),
+  "name": zod.string(),
+  "display_order": zod.number().int(),
+  "average_score": zod.number().nullable(),
+  "scored_count": zod.number().int()
+})),
+  "heatmap": zod.array(zod.object({
+  "id": zod.number().int(),
+  "session_date": zod.coerce.date(),
+  "prompt": zod.string(),
+  "sections": zod.array(zod.object({
+  "section_id": zod.number().int(),
+  "score": zod.number().int().nullable()
+}))
+}))
+})
+
+
+/**
  * @summary List shared case sections in scorecard order
  */
 export const GetCaseSectionsResponseItem = zod.object({

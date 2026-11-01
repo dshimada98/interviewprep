@@ -1,8 +1,7 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, Redirect, useLocation } from 'wouter';
-import { Menu, X, LogOut, AlertCircle, Loader2, ListChecks, ArrowRight, Star } from 'lucide-react';
+import { Menu, X, LogOut, AlertCircle, Loader2, ListChecks, Star, LayoutDashboard } from 'lucide-react';
 import { useAuth, messages } from '@/auth';
-import { PracticeAreas } from './practice-areas';
 
 const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -73,7 +72,7 @@ export function GuestOnly({ children }: { children: ReactNode }) {
   const { user, loading, error } = useAuth();
   if (loading) return <Splash />;
   if (error) return <SessionError />;
-  if (user) return <Redirect to="/" />;
+  if (user) return <Redirect to="/dashboard" />;
   return <>{children}</>;
 }
 
@@ -124,7 +123,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'signup' }) {
     setBusy(true);
     try {
       await authenticate(mode, signup ? { email: em, password, confirmPassword: confirm } : { email: em, password });
-      nav('/');
+      nav('/dashboard');
     } catch (err) {
       setFormErr(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
     } finally { setBusy(false); }
@@ -192,19 +191,20 @@ export function AppHeader() {
   }
   const btn = (
     <button onClick={out} disabled={busy}
-      className="ip-focus min-h-11 px-4 rounded-lg inline-flex items-center gap-2 font-semibold border border-white/30 hover:bg-white/10 disabled:opacity-60">
+      className="ip-focus min-h-11 px-4 rounded-lg inline-flex items-center gap-2 whitespace-nowrap font-semibold border border-white/30 hover:bg-white/10 disabled:opacity-60">
       <LogOut className="h-4 w-4" aria-hidden /> {busy ? 'Logging out...' : 'Log out'}
     </button>
   );
   return (
     <header className="text-white" style={{ background: 'var(--navy)' }}>
-      <div className="max-w-5xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between">
-        <Link href="/" className="ip-focus min-h-11 inline-flex items-center rounded"><Mark /></Link>
+      <div className="max-w-6xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between gap-4">
+        <Link href="/dashboard" className="ip-focus min-h-11 inline-flex items-center rounded"><Mark /></Link>
         <div className="hidden lg:flex items-center gap-4">
+          <Link href="/dashboard" data-testid="link-nav-dashboard" className="ip-focus min-h-11 px-3 rounded-lg inline-flex items-center gap-2 font-semibold hover:bg-white/10"><LayoutDashboard className="h-4 w-4" aria-hidden />Dashboard</Link>
           <Link href="/sessions" data-testid="link-nav-sessions" className="ip-focus min-h-11 px-3 rounded-lg inline-flex items-center gap-2 font-semibold hover:bg-white/10"><ListChecks className="h-4 w-4" aria-hidden />Sessions</Link>
           <Link href="/starred" data-testid="link-nav-starred" className="ip-focus min-h-11 px-3 rounded-lg inline-flex items-center gap-2 font-semibold hover:bg-white/10"><Star className="h-4 w-4" aria-hidden />Starred</Link>
-          <Link href="/sessions/new" data-testid="link-nav-log-session" className="ip-focus min-h-11 px-3 rounded-lg inline-flex items-center justify-center font-semibold border border-white/30">+ Log session</Link>
-          <span className="text-sm text-white/75 truncate max-w-[12rem]">{user?.email}</span>
+          <Link href="/sessions/new" data-testid="link-nav-log-session" className="ip-focus min-h-11 px-3 rounded-lg inline-flex items-center justify-center whitespace-nowrap font-semibold border border-white/30">+ Log session</Link>
+          <span className="hidden xl:inline text-sm text-white/75 truncate max-w-[10rem]">{user?.email}</span>
           {btn}
         </div>
         <button className="lg:hidden ip-focus h-11 w-11 grid place-items-center rounded-lg border border-white/30"
@@ -214,6 +214,7 @@ export function AppHeader() {
       </div>
       {open && (
         <div id="mobile-menu" className="lg:hidden px-5 pb-4 space-y-3 ip-rise">
+          <Link href="/dashboard" onClick={() => setOpen(false)} data-testid="link-mobile-dashboard" className="ip-focus min-h-11 w-full rounded-lg inline-flex items-center justify-center gap-2 font-semibold border border-white/30"><LayoutDashboard className="h-4 w-4" aria-hidden />Dashboard</Link>
           <Link href="/sessions" onClick={() => setOpen(false)} className="ip-focus min-h-11 w-full rounded-lg inline-flex items-center justify-center gap-2 font-semibold border border-white/30"><ListChecks className="h-4 w-4" aria-hidden />Sessions</Link>
           <Link href="/starred" onClick={() => setOpen(false)} data-testid="link-mobile-starred" className="ip-focus min-h-11 w-full rounded-lg inline-flex items-center justify-center gap-2 font-semibold border border-white/30"><Star className="h-4 w-4" aria-hidden />Starred</Link>
           <Link href="/sessions/new" onClick={() => setOpen(false)} className="ip-focus min-h-11 w-full rounded-lg inline-flex items-center justify-center font-semibold border border-white/30">+ Log session</Link>
@@ -223,28 +224,5 @@ export function AppHeader() {
       )}
       {err && <div className="bg-white px-5 sm:px-8 py-3 border-b"><div className="max-w-5xl mx-auto"><Inline>{err}</Inline></div></div>}
     </header>
-  );
-}
-
-export function HomePage() {
-  const { user } = useAuth();
-  useEffect(() => { document.title = 'InterviewPrep'; }, []);
-  return (
-    <div className="min-h-[100dvh]">
-      <AppHeader />
-      <main className="max-w-5xl mx-auto px-5 sm:px-8 py-12 sm:py-20" style={{ color: 'var(--navy)' }}>
-        <p className="ip-rise text-xs font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--green-text)' }}>Workspace</p>
-        <h1 className="ip-rise mt-3 text-3xl sm:text-5xl font-bold tracking-tight" style={{ animationDelay: '60ms' }}>Welcome to InterviewPrep</h1>
-        <div className="ip-rise mt-8 rounded-xl p-6 sm:p-8 border-l-4" style={{ background: 'var(--panel)', borderColor: 'var(--green)', animationDelay: '120ms' }}>
-          <p className="text-sm text-muted-foreground">Signed in as</p>
-          <p className="mt-1 text-lg font-semibold break-all">{user?.email}</p>
-        </div>
-        <Link href="/sessions" data-testid="link-home-sessions" className="ip-focus ip-rise mt-6 flex items-center justify-between gap-4 min-h-11 rounded-xl p-5 sm:p-6 text-white" style={{ background: 'var(--navy)', borderBottom: '3px solid var(--green)', animationDelay: '160ms' }}>
-          <span><span className="block text-lg font-bold">Practice sessions</span><span className="block text-sm text-white/75">Log a new session or review past practice.</span></span>
-          <ArrowRight className="h-5 w-5 shrink-0" aria-hidden />
-        </Link>
-        <PracticeAreas />
-      </main>
-    </div>
   );
 }

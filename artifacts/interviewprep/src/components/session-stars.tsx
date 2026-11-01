@@ -80,7 +80,7 @@ export function useStarToggle() {
       // Refetch lists only once no toggle for this user is pending, so a refetch cannot
       // overwrite another session's optimistic state. A failed refetch keeps cached data.
       if (![...inflight].some(x => x.startsWith(`${uid}:`))) {
-        void invalidateLists(qc, uid);
+        void invalidateLists(qc, uid, { dashboard: false });
       }
       void qc.invalidateQueries({ queryKey: detailKey(s.id, uid), exact: true });
     }

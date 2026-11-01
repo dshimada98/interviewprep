@@ -24,6 +24,11 @@ test('phone and laptop: real signup, refresh, logout, validation and login', asy
       emails.push(email);
       const password = 'browser-test-only-password';
       const clickSubmit = () => page.getByRole('button', { name: 'Create account', exact: true }).click();
+      async function expectDashboard() {
+        await expect(page).toHaveURL(/\/dashboard$/);
+        await expect(page.getByRole('heading', { name: 'Dashboard', exact: true })).toBeVisible();
+        await expect(page.getByText('Your dashboard fills in as you log sessions.', { exact: true })).toBeVisible();
+      }
       async function fits() {
         assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
         for (const control of await page.locator('main input, main button:visible, header button:visible').all()) {
@@ -40,7 +45,7 @@ test('phone and laptop: real signup, refresh, logout, validation and login', asy
       }
       await page.goto('/');
       await expect(page).toHaveURL(/\/login$/);
-      await expect(page.getByText('Welcome to InterviewPrep', { exact: true })).toHaveCount(0);
+      await expect(page.getByRole('heading', { name: 'Dashboard', exact: true })).toHaveCount(0);
       await page.getByRole('link', { name: 'Create an account' }).click();
       await clickSubmit();
       await expect(page.getByText('Please fill in all fields.', { exact: true })).toBeVisible();
@@ -58,13 +63,15 @@ test('phone and laptop: real signup, refresh, logout, validation and login', asy
       await page.getByLabel('Confirm password', { exact: true }).fill(password);
       await fits();
       await clickSubmit();
-      await expect(page.getByRole('heading', { name: 'Welcome to InterviewPrep', exact: true })).toBeVisible();
+      await expectDashboard();
+      if (width === 375) await page.getByRole('button', { name: 'Open menu' }).click();
       await expect(page.getByText(email, { exact: true }).last()).toBeVisible();
+      if (width === 375) await page.getByRole('button', { name: 'Close menu' }).click();
       await fits();
       await page.reload();
-      await expect(page.getByRole('heading', { name: 'Welcome to InterviewPrep', exact: true })).toBeVisible();
+      await expectDashboard();
       await page.goto('/login');
-      await expect(page.getByRole('heading', { name: 'Welcome to InterviewPrep', exact: true })).toBeVisible();
+      await expectDashboard();
       await logout();
       await page.goto('/');
       await expect(page).toHaveURL(/\/login$/);
@@ -81,7 +88,7 @@ test('phone and laptop: real signup, refresh, logout, validation and login', asy
       await expect(page.getByText('Email or password is incorrect.', { exact: true })).toBeVisible();
       await page.getByLabel('Password', { exact: true }).fill(password);
       await page.getByRole('button', { name: 'Log in', exact: true }).click();
-      await expect(page.getByRole('heading', { name: 'Welcome to InterviewPrep', exact: true })).toBeVisible();
+      await expectDashboard();
       await logout();
       assert.deepEqual(errors, []);
       await context.close();

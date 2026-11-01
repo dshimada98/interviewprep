@@ -9,6 +9,7 @@ import { pool } from './db.mjs';
 import { getGroupedQuestionTypes } from './question-types.mjs';
 import { getCaseSections } from './case-sections.mjs';
 import { practiceSessions } from './practice-sessions.mjs';
+import { getDashboard } from './dashboard.mjs';
 
 const production = process.env.NODE_ENV === 'production';
 if (!process.env.SESSION_SECRET) throw new Error('SESSION_SECRET is required. Add it in Replit Secrets.');
@@ -131,6 +132,9 @@ export async function requireAuth(req, res, next) {
 }
 // Register every future API router BELOW this default-deny boundary.
 app.use('/api', requireAuth);
+app.get('/api/dashboard', async (req, res) => {
+  res.json(await getDashboard(req.user.id));
+});
 app.get('/api/case-sections', async (_req, res) => {
   res.json(await getCaseSections());
 });
