@@ -6,10 +6,11 @@ import { useGetDashboard, type DashboardSummary } from '@workspace/api-client-re
 import { useAuth, sessionRequestOptions } from '@/auth';
 import { AppHeader } from './ip';
 import { PracticeAreas } from './practice-areas';
+import { NextCaseFocus } from './next-case-focus';
 import { dashboardKey, statusOf } from './session-keys';
 
 /** Band thresholds match the scorecard scale: below 3 red (1-2), 3 to below 4 amber (3), 4+ green (4-5). */
-export function bandColor(v: number) {
+function bandColor(v: number) {
   return v < 3 ? 'var(--score-1)' : v < 4 ? 'var(--score-3)' : 'var(--score-5)';
 }
 const fmt = (v: number) => v.toFixed(1);
@@ -205,6 +206,7 @@ export function DashboardPage() {
         <p className="ip-rise text-xs font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--green-text)' }}>Overview</p>
         <h1 className="ip-rise mt-2 mb-6 sm:mb-8 text-3xl sm:text-4xl font-bold tracking-tight">Dashboard</h1>
 
+        {d && <div className="mb-5"><NextCaseFocus focus={d.next_case_focus} scoreColor={bandColor} /></div>}
         {q.isLoading ? <Skeleton /> : q.isError && !d ? (
           <div className="rounded-xl border-l-4 bg-white p-5 space-y-3" style={{ borderColor: 'var(--score-1)' }} data-testid="status-dashboard-error">
             <p role="alert" className="flex items-start gap-2 font-medium" style={{ color: 'var(--score-1)' }}>

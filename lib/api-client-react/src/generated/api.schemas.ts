@@ -8,6 +8,28 @@
 /**
  * @nullable
  */
+export type NextCaseFocusNote = {
+  text: string;
+  session_id: number;
+  session_date: string;
+  prompt: string;
+} | null;
+
+export interface NextCaseFocusSection {
+  section_id: number;
+  section_name: string;
+  /** Average of scored rows in the five-case window, rounded to one decimal. */
+  average_score: number;
+  /** Number of cases in the window that scored this section; excludes N/A. */
+  scored_count: number;
+  /** Number of cases in the window, at most five; used for the last N cases label. */
+  case_count: number;
+  note: NextCaseFocusNote | null;
+}
+
+/**
+ * @nullable
+ */
 export type DashboardWeakestType = {
   name: string;
   average_score: number;
@@ -42,6 +64,8 @@ export interface DashboardHeatmapSession {
 }
 
 export interface DashboardSummary {
+  /** @maxItems 2 */
+  next_case_focus: NextCaseFocusSection[];
   total_cases: number;
   /** @nullable */
   average_case_score: number | null;

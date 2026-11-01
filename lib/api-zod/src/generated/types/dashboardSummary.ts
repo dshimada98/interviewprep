@@ -9,8 +9,11 @@ import type { DashboardCaseType } from './dashboardCaseType';
 import type { DashboardHeatmapSession } from './dashboardHeatmapSession';
 import type { DashboardSectionAverage } from './dashboardSectionAverage';
 import type { DashboardWeakestType } from './dashboardWeakestType';
+import type { NextCaseFocusSection } from './nextCaseFocusSection';
 
 export interface DashboardSummary {
+  /** @maxItems 2 */
+  next_case_focus: NextCaseFocusSection[];
   total_cases: number;
   /** @nullable */
   average_case_score: number | null;
