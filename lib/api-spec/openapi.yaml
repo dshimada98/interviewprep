@@ -148,6 +148,11 @@ paths:
             type: string
             enum: [low, mid, high]
         - in: query
+          name: book
+          description: Case book ID or none for no book / live case.
+          schema:
+            type: string
+        - in: query
           name: sort
           schema:
             type: string
@@ -258,6 +263,39 @@ paths:
           description: Deleted
         "404":
           description: Session not found
+  /case-books:
+    get:
+      operationId: getCaseBooks
+      security: [{sessionCookie: []}]
+      responses:
+        "200":
+          description: Shared and owned books, and the latest case session's book.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CaseBookList"
+    post:
+      operationId: createCaseBook
+      security: [{sessionCookie: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CaseBookInput"
+      responses:
+        "201":
+          description: Private book created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CaseBook"
+        "400":
+          description: Invalid or duplicate name
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionValidationError"
   /question-types:
     post:
       operationId: createQuestionType
@@ -400,8 +438,12 @@ components:
           type: integer
     DashboardSummary:
       type: object
-      required: [total_cases, average_case_score, weakest_case_type, behavioral_sessions, cases_by_type, section_averages, heatmap, next_case_focus]
+      required: [total_cases, average_case_score, weakest_case_type, behavioral_sessions, cases_by_type, by_case_book, section_averages, heatmap, next_case_focus]
       properties:
+        by_case_book:
+          type: array
+          items:
+            $ref: "#/components/schemas/DashboardCaseBook"
         next_case_focus:
           type: array
           maxItems: 2
@@ -467,6 +509,59 @@ components:
           type: string
         average_score:
           type: number
+    DashboardCaseBook:
+      type: object
+      required: [case_book_id, name, publication_year, count, average_score, last_practiced]
+      properties:
+        publication_year:
+          type: [integer, "null"]
+        case_book_id:
+          type: [integer, "null"]
+        name:
+          type: string
+        count:
+          type: integer
+        average_score:
+          type: number
+        last_practiced:
+          type: string
+          format: date
+    CaseBookInput:
+      type: object
+      required: [name]
+      properties:
+        publication_year:
+          type: [integer, "null"]
+          minimum: 1000
+          maximum: 9999
+        name:
+          type: string
+          maxLength: 60
+    CaseBook:
+      type: object
+      required: [id, name, user_id, publication_year, created_at]
+      properties:
+        publication_year:
+          type: [integer, "null"]
+        id:
+          type: integer
+        name:
+          type: string
+        user_id:
+          type: [integer, "null"]
+        created_at:
+          type: string
+          format: date-time
+    CaseBookList:
+      type: object
+      required: [books, most_recent_case_book_id]
+      properties:
+        books:
+          type: array
+          items:
+            $ref: "#/components/schemas/CaseBook"
+        most_recent_case_book_id:
+          type: [integer, "null"]
     DashboardCaseType:
       type: object
       required: [id, name, count]
@@ -579,6 +674,11 @@ components:
       type: object
       required: [session_date, question_type_id, prompt, format, overall_score]
       properties:
+        case_book_id:
+          type: [integer, "null"]
+          minimum: 1
+          maximum: 2147483647
+          description: Optional shared or owned case book. Omitted/null clears the link; behavioral sessions always clear it.
         story_id:
           type: [integer, "null"]
           minimum: 1
@@ -624,8 +724,14 @@ components:
       allOf:
         - $ref: "#/components/schemas/SessionInput"
         - type: object
-          required: [id, question_type_name, kind, created_at, starred, story_id, story_title]
+          required: [id, question_type_name, kind, created_at, starred, story_id, story_title, case_book_id, case_book_name, case_book_publication_year]
           properties:
+            case_book_publication_year:
+              type: [integer, "null"]
+            case_book_id:
+              type: [integer, "null"]
+            case_book_name:
+              type: [string, "null"]
             story_id:
               type: [integer, "null"]
             story_title:

@@ -64,6 +64,17 @@ export type StoryDetail = StorySummary & {
   sessions: StoryUsage[];
 };
 
+export interface DashboardCaseBook {
+  /** @nullable */
+  publication_year: number | null;
+  /** @nullable */
+  case_book_id: number | null;
+  name: string;
+  count: number;
+  average_score: number;
+  last_practiced: string;
+}
+
 /**
  * @nullable
  */
@@ -123,6 +134,7 @@ export interface DashboardHeatmapSession {
 }
 
 export interface DashboardSummary {
+  by_case_book: DashboardCaseBook[];
   /** @maxItems 2 */
   next_case_focus: NextCaseFocusSection[];
   total_cases: number;
@@ -133,6 +145,33 @@ export interface DashboardSummary {
   cases_by_type: DashboardCaseType[];
   section_averages: DashboardSectionAverage[];
   heatmap: DashboardHeatmapSession[];
+}
+
+export interface CaseBookInput {
+  /**
+     * @minimum 1000
+     * @maximum 9999
+     * @nullable
+     */
+  publication_year?: number | null;
+  /** @maxLength 60 */
+  name: string;
+}
+
+export interface CaseBook {
+  /** @nullable */
+  publication_year: number | null;
+  id: number;
+  name: string;
+  /** @nullable */
+  user_id: number | null;
+  created_at: string;
+}
+
+export interface CaseBookList {
+  books: CaseBook[];
+  /** @nullable */
+  most_recent_case_book_id: number | null;
 }
 
 export interface SectionScoreInput {
@@ -168,6 +207,13 @@ export const SessionInputFormat = {
 } as const;
 
 export interface SessionInput {
+  /**
+     * Optional shared or owned case book. Omitted/null clears the link; behavioral sessions always clear it.
+     * @minimum 1
+     * @maximum 2147483647
+     * @nullable
+     */
+  case_book_id?: number | null;
   /**
      * Optional owned story for behavioral sessions. Omitted/null clears the link; a case session always clears it.
      * @minimum 1
@@ -229,6 +275,12 @@ export const PracticeSessionKind = {
 } as const;
 
 export type PracticeSession = SessionInput & ({
+  /** @nullable */
+  case_book_publication_year: number | null;
+  /** @nullable */
+  case_book_id: number | null;
+  /** @nullable */
+  case_book_name: string | null;
   /** @nullable */
   story_id: number | null;
   /** @nullable */
@@ -313,6 +365,10 @@ q?: string;
 kind?: ListSessionsKind;
 type?: number;
 score?: ListSessionsScore;
+/**
+ * Case book ID or none for no book / live case.
+ */
+book?: string;
 sort?: ListSessionsSort;
 /**
  * When true, return only the current user's starred sessions.

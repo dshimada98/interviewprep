@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { app, sessionStore } from '../artifacts/interviewprep/server/app.mjs';
 import { pool } from '../artifacts/interviewprep/server/db.mjs';
 import { seedQuestionTypes } from '../artifacts/interviewprep/server/question-types.mjs';
+import { seedCaseBooks, caseBookSeeds } from '../artifacts/interviewprep/server/case-books.mjs';
 
 const userIds: number[] = [];
 const csrfTokens: string[] = [];
@@ -32,6 +33,7 @@ beforeAll(async () => {
   }
   // App import doesn't start its listener or startup seeder.
   await seedQuestionTypes();
+  await seedCaseBooks();
 });
 
 afterAll(async () => {
@@ -53,6 +55,207 @@ afterAll(async () => {
 });
 
 describe('practice-session data isolation', () => {
+  it('tracks publication-year editions separately without changing unyearred books or privacy', async () => {
+    const a = await signUp(), b = await signUp();
+    const before = (await a.agent.get('/api/case-books').expect(200)).body.books;
+    const shared = before.find((book: { name: string }) => book.name === 'Haas Casebook');
+    expect(shared.publication_year).toBeNull();
+    const post = (year: number | null, name = 'Haas Casebook') => a.agent.post('/api/case-books')
+      .set('X-CSRF-Token', a.csrfToken).send({ name, publication_year: year });
+    const old = (await post(2024).expect(201)).body;
+    const recent = (await post(2025).expect(201)).body;
+    expect(old.id).not.toBe(recent.id);
+    expect(old.publication_year).toBe(2024);
+    const duplicate = await post(2024, '  HAAS   CASEBOOK  ').expect(400);
+    expect(duplicate.body.errors.name).toBe('You already have a case book called HAAS CASEBOOK (2024).');
+    await post(null).expect(400);
+    const list = (await a.agent.get('/api/case-books').expect(200)).body.books;
+    expect(list.find((book: { id: number }) => book.id === shared.id)).toEqual(shared);
+    expect(list.filter((book: { user_id: number | null }) => book.user_id === a.id)
+      .map((book: { publication_year: number }) => book.publication_year)).toEqual([2025, 2024]);
+    expect((await b.agent.get('/api/case-books').expect(200)).body.books
+      .some((book: { id: number }) => book.id === old.id || book.id === recent.id)).toBe(false);
+    await b.agent.post('/api/case-books').set('X-CSRF-Token', b.csrfToken)
+      .send({ name: 'Haas Casebook', publication_year: 2024 }).expect(201);
+    const types = (await a.agent.get('/api/question-types').expect(200)).body;
+    for (const [book, date] of [[old, '2025-01-01'], [recent, '2025-01-02']] as const) {
+      const result = await a.agent.post('/api/sessions').set('X-CSRF-Token', a.csrfToken)
+        .send({ question_type_id: types.case[0].id, case_book_id: book.id, session_date: date,
+          prompt: 'Edition case', format: 'solo', overall_score: 4 }).expect(201);
+      expect(result.body.case_book_publication_year).toBe(book.publication_year);
+      expect((await a.agent.get(`/api/sessions/${result.body.id}`).expect(200)).body.case_book_publication_year)
+        .toBe(book.publication_year);
+      const filtered = (await a.agent.get('/api/sessions').query({ book: book.id }).expect(200)).body.sessions;
+      expect(filtered).toHaveLength(1);
+      expect(filtered[0].case_book_publication_year).toBe(book.publication_year);
+    }
+    expect((await a.agent.get('/api/case-books').expect(200)).body.most_recent_case_book_id).toBe(recent.id);
+    const rows = (await a.agent.get('/api/dashboard').expect(200)).body.by_case_book;
+    expect(rows).toHaveLength(2);
+    expect(rows.map((row: { publication_year: number }) => row.publication_year).sort()).toEqual([2024, 2025]);
+    expect(rows.every((row: { count: number }) => row.count === 1)).toBe(true);
+    await seedCaseBooks();
+    expect((await a.agent.get('/api/case-books').expect(200)).body.books.find((book: { id: number }) => book.id === shared.id))
+      .toEqual(shared);
+  });
+
+  it('validates publication years and enforces edition-aware database uniqueness', async () => {
+    const a = await signUp();
+    for (const year of [999, 10000, 2024.5, '2024', 'bad', '']) {
+      const r = await a.agent.post('/api/case-books').set('X-CSRF-Token', a.csrfToken)
+        .send({ name: 'Year validation', publication_year: year }).expect(400);
+      expect(r.body.errors.publication_year).toBe('Please enter a four-digit year, like 2025.');
+    }
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const name = `Shared edition ${randomUUID().slice(0, 8)}`;
+      await client.query('INSERT INTO case_books(name,publication_year) VALUES ($1,2024)', [name]);
+      await client.query('SAVEPOINT invalid');
+      await expect(client.query('INSERT INTO case_books(name,publication_year,user_id) VALUES ($1,2024,$2)',
+        [name.toUpperCase(), a.id])).rejects.toMatchObject({ code: '23505' });
+      await client.query('ROLLBACK TO SAVEPOINT invalid');
+      await client.query('INSERT INTO case_books(name,publication_year,user_id) VALUES ($1,2025,$2)', [name, a.id]);
+      await client.query('SAVEPOINT invalid');
+      await expect(client.query('INSERT INTO case_books(name,publication_year,user_id) VALUES ($1,2025,$2)',
+        [` ${name.toUpperCase()} `, a.id])).rejects.toMatchObject({ code: '23505' });
+      await client.query('ROLLBACK TO SAVEPOINT invalid');
+      await expect(client.query('INSERT INTO case_books(name,publication_year,user_id) VALUES ($1,999,$2)',
+        [name, a.id])).rejects.toMatchObject({ code: '23514' });
+    } finally {
+      await client.query('ROLLBACK');
+      client.release();
+    }
+  });
+
+  it('keeps private case books out of other users lists, session writes, and filters', async () => {
+    const a = await signUp(), b = await signUp();
+    const name = `Private book ${randomUUID().slice(0, 8)}`;
+    const created = await a.agent.post('/api/case-books').set('X-CSRF-Token', a.csrfToken)
+      .send({ name, user_id: b.id }).expect(201);
+    expect(created.body.user_id).toBe(a.id);
+    const id = created.body.id;
+    const aList = (await a.agent.get('/api/case-books').expect(200)).body;
+    const bList = (await b.agent.get('/api/case-books').expect(200)).body;
+    expect(aList.books.some((book: { id: number }) => book.id === id)).toBe(true);
+    expect(bList.books.some((book: { id: number }) => book.id === id)).toBe(false);
+    expect(aList.most_recent_case_book_id).toBeNull();
+    expect(bList.most_recent_case_book_id).toBeNull();
+    const types = (await a.agent.get('/api/question-types').expect(200)).body;
+    const input = { session_date: '2025-01-01', question_type_id: types.case[0].id,
+      prompt: 'Book privacy', overall_score: 3, format: 'solo', case_book_id: id };
+    const invalid = await b.agent.post('/api/sessions').set('X-CSRF-Token', b.csrfToken)
+      .send(input).expect(400);
+    expect(invalid.body.errors.case_book_id).toBe('Please choose a case book.');
+    await b.agent.get('/api/sessions').query({ book: id }).expect(400);
+    const bSession = await b.agent.post('/api/sessions').set('X-CSRF-Token', b.csrfToken)
+      .send({ ...input, case_book_id: null }).expect(201);
+    await b.agent.put(`/api/sessions/${bSession.body.id}`).set('X-CSRF-Token', b.csrfToken)
+      .send(input).expect(400);
+    const own = await a.agent.post('/api/sessions').set('X-CSRF-Token', a.csrfToken)
+      .send(input).expect(201);
+    expect(own.body).toMatchObject({ case_book_id: id, case_book_name: name });
+    expect((await a.agent.get(`/api/sessions/${own.body.id}`).expect(200)).body.case_book_name).toBe(name);
+    expect((await a.agent.get('/api/case-books').expect(200)).body.most_recent_case_book_id).toBe(id);
+    expect((await b.agent.get('/api/dashboard').expect(200)).body.by_case_book)
+      .toEqual([{ case_book_id: null, name: 'No book / live case', publication_year: null, count: 1, average_score: 3, last_practiced: '2025-01-01' }]);
+    await b.agent.post('/api/case-books').set('X-CSRF-Token', b.csrfToken).send({ name }).expect(201);
+  });
+
+  it('validates and normalizes book names in the API and database, with idempotent shared seeding', async () => {
+    const a = await signUp();
+    const post = (name: string) => a.agent.post('/api/case-books')
+      .set('X-CSRF-Token', a.csrfToken).send({ name });
+    expect((await post(' \t ').expect(400)).body.errors.name).toBe('Please enter a case book name.');
+    expect((await post('x'.repeat(61)).expect(400)).body.errors.name).toBe('Please keep it under 60 characters.');
+    expect((await post('  CASE   in Point ').expect(400)).body.errors.name)
+      .toBe('You already have a case book called CASE in Point.');
+    const name = `Book ${randomUUID().slice(0, 8)}`;
+    await post(name).expect(201);
+    await post(name.toUpperCase().replace(' ', '   ')).expect(400);
+    await a.agent.post('/api/case-books').send({ name }).expect(403);
+    await request(app).get('/api/case-books').expect(401);
+    await request(app).post('/api/case-books').send({ name }).expect(401);
+    for (const duplicate of [name.toUpperCase(), '  CASE   IN POINT  ']) {
+      await expect(pool.query('INSERT INTO case_books(name,user_id) VALUES ($1,$2)',
+        [duplicate, a.id])).rejects.toMatchObject({ code: '23505' });
+    }
+    await expect(pool.query('INSERT INTO case_books(name,user_id) VALUES ($1,$2)',
+      ['x'.repeat(61), a.id])).rejects.toMatchObject({ code: '23514' });
+    const before = (await pool.query('SELECT id,name,user_id FROM case_books ORDER BY id')).rows;
+    await Promise.all([seedCaseBooks(), seedCaseBooks(), seedCaseBooks()]);
+    expect((await pool.query('SELECT id,name,user_id FROM case_books ORDER BY id')).rows).toEqual(before);
+    const list = (await a.agent.get('/api/case-books').expect(200)).body.books;
+    expect(list.filter((book: { user_id: number | null }) => book.user_id === null).map((book: { name: string }) => book.name).sort())
+      .toEqual([...caseBookSeeds].sort());
+    expect(list.at(-1).name).toBe(name);
+    const raceName = `Race ${randomUUID().slice(0, 8)}`;
+    expect((await Promise.all([post(raceName), post(raceName.toUpperCase())])).map(r => r.status).sort()).toEqual([201, 400]);
+  });
+
+  it('aggregates case books, combines filters, and uses the newest case even when its book is empty', async () => {
+    const a = await signUp();
+    expect((await a.agent.get('/api/dashboard').expect(200)).body.by_case_book).toEqual([]);
+    const types = (await a.agent.get('/api/question-types').expect(200)).body;
+    const books = (await a.agent.get('/api/case-books').expect(200)).body.books;
+    const book = books[0].id, other = books[1].id;
+    const input = { question_type_id: types.case[0].id, prompt: 'Book aggregation', format: 'solo' };
+    const create = async (date: string, score: number, bookId: number | null, type = types.case[0].id) =>
+      (await a.agent.post('/api/sessions').set('X-CSRF-Token', a.csrfToken)
+        .send({ ...input, session_date: date, overall_score: score, case_book_id: bookId, question_type_id: type }).expect(201)).body;
+    const first = await create('2025-01-01', 3, book);
+    const second = await create('2025-01-02', 4, book);
+    await create('2025-01-03', 5, other);
+    expect((await a.agent.get('/api/case-books').expect(200)).body.most_recent_case_book_id).toBe(other);
+    // A later-created backdated row must not replace the newest session-date default.
+    await create('2024-12-31', 2, book);
+    expect((await a.agent.get('/api/case-books').expect(200)).body.most_recent_case_book_id).toBe(other);
+    const none = await create('2025-01-04', 1, null);
+    const behavioral = await create('2025-01-05', 5, book, types.behavioral[0].id);
+    expect(behavioral.case_book_id).toBeNull();
+    expect(behavioral.case_book_name).toBeNull();
+    expect((await a.agent.get('/api/case-books').expect(200)).body.most_recent_case_book_id).toBeNull();
+    const dashboard = (await a.agent.get('/api/dashboard').expect(200)).body;
+    expect(dashboard.by_case_book).toHaveLength(3);
+    expect(dashboard.by_case_book[0]).toEqual({ case_book_id: book, name: books[0].name, publication_year: null, count: 3,
+      average_score: 3, last_practiced: '2025-01-02' });
+    const thirds = await create('2024-12-30', 4, book);
+    expect((await a.agent.get('/api/dashboard').expect(200)).body.by_case_book[0].average_score).toBe(3.3);
+    const filtered = (await a.agent.get('/api/sessions').query({ book, score: 'high', q: 'aggregation', sort: 'highest' }).expect(200)).body;
+    expect(filtered.sessions.map((s: { id: number }) => s.id)).toEqual([second.id, thirds.id]);
+    expect(filtered.total).toBe(7);
+    const noBook = (await a.agent.get('/api/sessions').query({ book: 'none' }).expect(200)).body;
+    expect(noBook.sessions.map((s: { id: number }) => s.id)).toEqual([none.id]);
+    await a.agent.get('/api/sessions').query({ book: '-1' }).expect(400);
+    await a.agent.get('/api/sessions').query({ book: '2147483647' }).expect(400);
+    const switched = await a.agent.put(`/api/sessions/${first.id}`).set('X-CSRF-Token', a.csrfToken)
+      .send({ ...input, session_date: '2025-01-01', overall_score: 3, case_book_id: book,
+        question_type_id: types.behavioral[0].id }).expect(200);
+    expect(switched.body.case_book_id).toBeNull();
+  });
+
+  it('clears a deleted book link without deleting the session, scores, or star', async () => {
+    const a = await signUp();
+    const book = (await a.agent.post('/api/case-books').set('X-CSRF-Token', a.csrfToken)
+      .send({ name: `Delete ${randomUUID().slice(0, 8)}` }).expect(201)).body;
+    const types = (await a.agent.get('/api/question-types').expect(200)).body;
+    const section = (await a.agent.get('/api/case-sections').expect(200)).body[0];
+    const saved = (await a.agent.post('/api/sessions').set('X-CSRF-Token', a.csrfToken).send({
+      question_type_id: types.case[0].id, case_book_id: book.id, session_date: '2025-01-01',
+      prompt: 'Preserved after book deletion', format: 'solo', overall_score: 4,
+      section_scores: [{ section_id: section.id, score: 3 }],
+    }).expect(201)).body;
+    await a.agent.post(`/api/sessions/${saved.id}/star`).set('X-CSRF-Token', a.csrfToken).expect(204);
+    await pool.query('DELETE FROM case_books WHERE id=$1 AND user_id=$2', [book.id, a.id]);
+    const after = (await a.agent.get(`/api/sessions/${saved.id}`).expect(200)).body;
+    expect(after.case_book_id).toBeNull();
+    expect(after.case_book_name).toBeNull();
+    expect(after.overall_score).toBe(4);
+    expect(after.starred).toBe(true);
+    expect(after.section_scores).toHaveLength(1);
+    expect(after.section_scores[0].score).toBe(3);
+  });
+
   it('keeps custom behavioral categories private and rejects foreign IDs in writes and filters', async () => {
     const a = await signUp(), b = await signUp();
     const name = `Coaching ${randomUUID().slice(0, 8)}`;

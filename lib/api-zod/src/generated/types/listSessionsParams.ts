@@ -14,6 +14,10 @@ q?: string;
 kind?: ListSessionsKind;
 type?: number;
 score?: ListSessionsScore;
+/**
+ * Case book ID or none for no book / live case.
+ */
+book?: string;
 sort?: ListSessionsSort;
 /**
  * When true, return only the current user's starred sessions.

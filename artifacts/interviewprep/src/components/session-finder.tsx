@@ -6,6 +6,8 @@ import {
   type GroupedQuestionTypes, type ListSessionsKind, type ListSessionsParams, type ListSessionsScore, type ListSessionsSort,
 } from '@workspace/api-client-react';
 import { sessionRequestOptions, useAuth } from '@/auth';
+import { NO_BOOK, useCaseBooks } from './case-book-select';
+import { caseBookLabel } from './case-book-label';
 
 const KINDS: { v: ListSessionsKind | ''; label: string }[] = [{ v: '', label: 'All' }, { v: 'case', label: 'Case' }, { v: 'behavioral', label: 'Behavioral' }];
 const SCORES: { v: ListSessionsScore | ''; label: string; color: string }[] = [
@@ -19,11 +21,11 @@ const SORTS: { v: ListSessionsSort; label: string }[] = [
   { v: 'highest', label: 'Highest score' }, { v: 'lowest', label: 'Lowest score' },
 ];
 
-export type FinderState = { q: string; kind: ListSessionsKind | ''; type: number | null; score: ListSessionsScore | ''; sort: ListSessionsSort };
+export type FinderState = { q: string; kind: ListSessionsKind | ''; type: number | null; score: ListSessionsScore | ''; sort: ListSessionsSort; book: string };
 
 function parse(search: string): FinderState {
   const p = new URLSearchParams(search);
-  const kind = p.get('kind'), score = p.get('score'), sort = p.get('sort'), type = p.get('type') ?? '';
+  const kind = p.get('kind'), score = p.get('score'), sort = p.get('sort'), type = p.get('type') ?? '', book = p.get('book') ?? '';
   const t = /^\d{1,10}$/.test(type) ? Number(type) : NaN;
   return {
     q: p.get('q') ?? '',
@@ -31,6 +33,7 @@ function parse(search: string): FinderState {
     type: Number.isSafeInteger(t) && t > 0 && t <= 2147483647 ? t : null,
     score: score === 'low' || score === 'mid' || score === 'high' ? score : '',
     sort: SORTS.some(s => s.v === sort) ? (sort as ListSessionsSort) : 'newest',
+    book: book === 'none' || (/^\d{1,10}$/.test(book) && Number(book) > 0 && Number(book) <= 2147483647) ? book : '',
   };
 }
 function serialize(s: FinderState) {
@@ -39,6 +42,7 @@ function serialize(s: FinderState) {
   if (s.kind) p.set('kind', s.kind);
   if (s.type !== null) p.set('type', String(s.type));
   if (s.score) p.set('score', s.score);
+  if (s.book) p.set('book', s.book);
   if (s.sort !== 'newest') p.set('sort', s.sort);
   const str = p.toString();
   return str ? `/sessions?${str}` : '/sessions';
@@ -79,7 +83,11 @@ export function useSessionFinder() {
   const allowed = grouped ? (url.kind ? grouped[url.kind] : [...grouped.case, ...grouped.behavioral]) : [];
   const typeValid = url.type !== null && allowed.some(t => t.id === url.type);
   const typePending = url.type !== null && types.isLoading;
-  const state: FinderState = { ...url, type: typeValid ? url.type : null };
+  const books = useCaseBooks();
+  // Ignore an unknown book id from the URL once the list loads.
+  const bookValid = url.book === 'none' || (!!url.book && !!books.data?.books.some(b => String(b.id) === url.book));
+  const bookPending = !!url.book && url.book !== 'none' && books.isLoading;
+  const state: FinderState = { ...url, type: typeValid ? url.type : null, book: bookValid ? url.book : '' };
 
   const write = (next: FinderState, replace = false) => nav(serialize(next), { replace });
   const update = (patch: Partial<FinderState>) => write({ ...state, q: lastUrlQ.current, ...patch });
@@ -109,10 +117,11 @@ export function useSessionFinder() {
     type: state.type ?? undefined,
     score: state.score || undefined,
     sort: state.sort === 'newest' ? undefined : state.sort,
+    book: state.book || undefined,
   };
-  const filterCount = (state.kind ? 1 : 0) + (state.type !== null ? 1 : 0) + (state.score ? 1 : 0) + (state.sort !== 'newest' ? 1 : 0);
+  const filterCount = (state.kind ? 1 : 0) + (state.type !== null ? 1 : 0) + (state.score ? 1 : 0) + (state.book ? 1 : 0) + (state.sort !== 'newest' ? 1 : 0);
   const active = filterCount > 0 || !!state.q.trim() || !!text.trim();
-  return { state, text, params, ready: !typePending, grouped, typesError: !!types.error, filterCount, active, setSearch, setKind, update, clear };
+  return { state, text, params, ready: !typePending && !bookPending, grouped, books: books.data?.books, booksError: !!books.error, typesError: !!types.error, filterCount, active, setSearch, setKind, update, clear };
 }
 
 export type SessionFinder = ReturnType<typeof useSessionFinder>;
@@ -180,6 +189,17 @@ export function FinderControls({ f }: { f: SessionFinder }) {
                     {g.list.map(t => <option key={t.id} value={t.id}>{t.name}{t.user_id != null ? ' (custom)' : ''}</option>)}
                   </optgroup>
                 ))}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2" aria-hidden />
+          </span>
+        </label>
+        <label className="block min-w-0 lg:flex-1 lg:max-w-[200px]"><FieldLabel>Case book</FieldLabel>
+          <span className="relative block">
+            <select data-testid="select-filter-book" className={selCls} disabled={!f.books}
+              value={state.book} onChange={e => f.update({ book: e.target.value })}>
+              <option value="">{f.booksError ? 'Books unavailable' : f.books ? 'All books' : 'Loading books'}</option>
+              <option value="none">{NO_BOOK}</option>
+              {(f.books ?? []).map(b => <option key={b.id} value={String(b.id)}>{caseBookLabel(b.name, b.publication_year)}{b.user_id != null ? ' (custom)' : ''}</option>)}
             </select>
             <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2" aria-hidden />
           </span>

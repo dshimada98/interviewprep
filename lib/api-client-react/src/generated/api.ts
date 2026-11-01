@@ -20,6 +20,9 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  CaseBook,
+  CaseBookInput,
+  CaseBookList,
   CaseSection,
   DashboardSummary,
   GetQuestionTypes401,
@@ -1130,6 +1133,159 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getDeleteSessionMutationOptions(options));
+    }
+
+export const getGetCaseBooksUrl = () => {
+
+
+
+
+  return `/api/case-books`
+}
+
+export const getCaseBooks = async ( options?: Parameters<typeof customFetch>[1]): Promise<CaseBookList> => {
+
+  return customFetch<CaseBookList>(getGetCaseBooksUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCaseBooksQueryKey = () => {
+    return [
+    `/api/case-books`
+    ] as const;
+    }
+
+
+export const getGetCaseBooksQueryOptions = <TData = Awaited<ReturnType<typeof getCaseBooks>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCaseBooks>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCaseBooksQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCaseBooks>>> = ({ signal }) => getCaseBooks({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCaseBooks>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCaseBooksQueryResult = NonNullable<Awaited<ReturnType<typeof getCaseBooks>>>
+export type GetCaseBooksQueryError = ErrorType<unknown>
+
+
+
+export function useGetCaseBooks<TData = Awaited<ReturnType<typeof getCaseBooks>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCaseBooks>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCaseBooksQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateCaseBookUrl = () => {
+
+
+
+
+  return `/api/case-books`
+}
+
+export const createCaseBook = async (caseBookInput: CaseBookInput, options?: Parameters<typeof customFetch>[1]): Promise<CaseBook> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<CaseBook>(getCreateCaseBookUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(caseBookInput)
+  }
+);}
+
+
+
+
+
+export const getCreateCaseBookMutationKey = () => ['createCaseBook'] as const;
+
+export const getCreateCaseBookMutationOptions = <TError = ErrorType<SessionValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCaseBook>>, TError,CreateCaseBookMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createCaseBook>>, TError,CreateCaseBookMutationVariables, TContext> => {
+
+const mutationKey = getCreateCaseBookMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createCaseBook>>, CreateCaseBookMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  createCaseBook(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateCaseBookMutationResult = NonNullable<Awaited<ReturnType<typeof createCaseBook>>>
+    export type CreateCaseBookMutationBody = BodyType<CaseBookInput>
+    export type CreateCaseBookMutationError = ErrorType<SessionValidationError>
+    export type CreateCaseBookMutationVariables = {data: BodyType<CaseBookInput>}
+
+    export const useCreateCaseBook = <TError = ErrorType<SessionValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCaseBook>>, TError,CreateCaseBookMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createCaseBook>>,
+        TError,
+        CreateCaseBookMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateCaseBookMutationOptions(options));
     }
 
 export const getCreateQuestionTypeUrl = () => {

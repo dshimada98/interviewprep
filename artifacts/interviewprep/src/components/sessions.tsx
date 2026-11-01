@@ -16,6 +16,8 @@ import { AppHeader } from './ip';
 import { detailKey, invalidateLists, listKey, removeFromLists, starredKey, statusOf, storyDetailKey } from './session-keys';
 import { StorySelect } from './story-select';
 import { CategorySelect } from './category-select';
+import { CaseBookSelect, NO_BOOK, useCaseBooks } from './case-book-select';
+import { caseBookLabel } from './case-book-label';
 import { ClearFilters, FinderControls, useSessionFinder } from './session-finder';
 import { STAR_ERROR, StarButton, useStarToggle, type StarToggle } from './session-stars';
 import { ScorecardEditor, ScorecardView, draftsFrom, draftsToInput, useCaseSections, type ScoreDrafts } from './scorecard';
@@ -128,7 +130,8 @@ function SessionCards({ data, star }: { data: PracticeSession[]; star: StarToggl
               <span className="ml-auto inline-flex items-center gap-2"><ScoreBar score={s.overall_score} /><span className="rounded-full px-2.5 py-1 font-semibold tabular-nums text-white" style={{ background: `var(--score-${s.overall_score})` }}>{s.overall_score}/5</span></span>
             </div>
             <p className="mt-2.5 font-medium line-clamp-2 break-words group-hover:underline underline-offset-4">{s.prompt}</p>
-            <p className="mt-1.5 text-xs text-muted-foreground">{fmtLabel(s.format)}{s.duration_minutes != null ? ` / ${s.duration_minutes} min` : ''}</p>
+            {s.kind === 'case' && <p className="mt-1.5 text-xs text-muted-foreground break-words" data-testid={`text-case-book-${s.id}`}>{caseBookLabel(s.case_book_name ?? NO_BOOK, s.case_book_publication_year)}</p>}
+            <p className="mt-1 text-xs text-muted-foreground">{fmtLabel(s.format)}{s.duration_minutes != null ? ` / ${s.duration_minutes} min` : ''}</p>
           </Link>
           <div className="absolute top-3 right-3 sm:top-4 sm:right-4"><StarButton session={s} star={star} /></div>
           {star.errors[s.id] && <div className="px-4 pt-2" data-testid={`status-star-error-${s.id}`}><ErrText>{star.errors[s.id]}</ErrText></div>}
@@ -316,6 +319,7 @@ export function SessionDetailPage({ rawId }: { rawId?: string }) {
                 <KindTag kind={s.kind} />
                 <span className="font-semibold">{s.question_type_name}</span>
               </div>
+              {s.kind === 'case' && <p className="mt-2 text-sm text-muted-foreground break-words" data-testid="text-case-book">{caseBookLabel(s.case_book_name ?? NO_BOOK, s.case_book_publication_year)}</p>}
               <h1 className="mt-3 text-2xl sm:text-3xl font-bold tracking-tight break-words whitespace-pre-wrap" data-testid="text-prompt">{s.prompt}</h1>
               {s.kind === 'behavioral' && s.story_id != null && (
                 <p className="mt-3 text-sm" data-testid="text-story-used">
@@ -393,9 +397,9 @@ export function SessionDetailPage({ rawId }: { rawId?: string }) {
 
 /* ---------------- Form ---------------- */
 
-type FormVals = { scores?: ScoreDrafts; session_date: string; question_type_id: string; prompt: string; format: string; overall_score: string; duration_minutes: string; went_well: string; to_improve: string; story_id: string };
+type FormVals = { scores?: ScoreDrafts; session_date: string; question_type_id: string; prompt: string; format: string; overall_score: string; duration_minutes: string; went_well: string; to_improve: string; story_id: string; case_book_id: string };
 type Errs = Partial<Record<Exclude<keyof FormVals, 'scores'> | 'section_scores' | 'form', string>>;
-const EMPTY: FormVals = { session_date: '', question_type_id: '', prompt: '', format: '', overall_score: '', duration_minutes: '', went_well: '', to_improve: '', story_id: '' };
+const EMPTY: FormVals = { session_date: '', question_type_id: '', prompt: '', format: '', overall_score: '', duration_minutes: '', went_well: '', to_improve: '', story_id: '', case_book_id: '' };
 const SAVE_ERROR = "Couldn't save your session. Please try again.";
 const FIX_FIELDS = 'Please fix the highlighted fields.';
 
@@ -465,8 +469,8 @@ const aria = (id: string, error?: string, hint?: boolean) => ({
   style: { borderColor: error ? '#C0392B' : undefined },
 });
 
-function SessionForm({ initial, submitLabel, busy, onSubmit, cancelHref, serverErrors }: {
-  initial: FormVals; submitLabel: string; busy: boolean; cancelHref: string; serverErrors: Errs;
+function SessionForm({ initial, submitLabel, busy, onSubmit, cancelHref, serverErrors, defaultLatestBook }: {
+  initial: FormVals; defaultLatestBook?: boolean; submitLabel: string; busy: boolean; cancelHref: string; serverErrors: Errs;
   onSubmit: (input: SessionInput) => void;
 }) {
   const { user } = useAuth();
@@ -475,6 +479,19 @@ function SessionForm({ initial, submitLabel, busy, onSubmit, cancelHref, serverE
   const [kind, setKind] = useState<'case' | 'behavioral' | null>(null);
   const [drafts, setDrafts] = useState<ScoreDrafts>(initial.scores ?? {});
   const [addingType, setAddingType] = useState(false);
+  const [addingBook, setAddingBook] = useState(false);
+  const books = useCaseBooks();
+  use401(books.error);
+  // New form only: apply the most recent case book exactly once, and never after the user touched the field.
+  const bookTouched = useRef(!defaultLatestBook);
+  const latest = books.data?.most_recent_case_book_id;
+  useEffect(() => {
+    // Cached data can still describe the session before the last save. Wait
+    // for the mount-time refetch before consuming this one-time default.
+    if (bookTouched.current || latest === undefined || books.isFetching || books.error) return;
+    bookTouched.current = true;
+    if (latest !== null) setV(p => ({ ...p, case_book_id: String(latest) }));
+  }, [latest, books.isFetching, books.error]);
   const sections = useCaseSections();
   use401(sections.error);
   const formRef = useRef<HTMLFormElement>(null);
@@ -517,10 +534,11 @@ function SessionForm({ initial, submitLabel, busy, onSubmit, cancelHref, serverE
     e.preventDefault();
     if (busy) return;
     if (addingType) { focusErrors.current = true; setErrs({ form: 'Save or cancel your new category before saving the session.' }); return; }
+    if (addingBook && activeKind === 'case') { focusErrors.current = true; setErrs({ form: 'Save or cancel your new case book before saving the session.' }); return; }
     const ids = new Set((types.data?.[activeKind] ?? []).map(t => t.id));
     const [er, input] = validate(v, ids);
     if (!input) { focusErrors.current = true; setErrs(er); return; }
-    if (activeKind === 'behavioral') { setErrs({}); onSubmit({ ...input, story_id: v.story_id ? Number(v.story_id) : null, section_scores: [] }); return; }
+    if (activeKind === 'behavioral') { setErrs({}); onSubmit({ ...input, story_id: v.story_id ? Number(v.story_id) : null, case_book_id: null, section_scores: [] }); return; }
     // Never submit a case without the reference list; the scorecard shows a retry.
     const sc = sections.data ? draftsToInput(drafts, sections.data) : null;
     if (!sc) {
@@ -530,7 +548,7 @@ function SessionForm({ initial, submitLabel, busy, onSubmit, cancelHref, serverE
       return;
     }
     setErrs({});
-    onSubmit({ ...input, story_id: null, section_scores: sc });
+    onSubmit({ ...input, story_id: null, case_book_id: v.case_book_id ? Number(v.case_book_id) : null, section_scores: sc });
   }
 
   const counter = (s: string) => <span className="tabular-nums">{s.trim().length}/4000</span>;
@@ -548,7 +566,8 @@ function SessionForm({ initial, submitLabel, busy, onSubmit, cancelHref, serverE
             onClick={() => {
               if (activeKind !== k) {
                 setKind(k);
-                setV(p => ({ ...p, question_type_id: '', story_id: '' }));
+                bookTouched.current = true;
+                setV(p => ({ ...p, question_type_id: '', story_id: '', case_book_id: '' }));
                 setErrs(previous => {
                   const next = { ...previous };
                   delete next.section_scores;
@@ -582,6 +601,15 @@ function SessionForm({ initial, submitLabel, busy, onSubmit, cancelHref, serverE
             )}
         </FieldWrap>
       </div>
+
+      {activeKind === 'case' && types.data && (
+        <FieldWrap id="case_book_id" label="Case book" error={errs.case_book_id}>
+          <CaseBookSelect id="case_book_id" className={inputCls} value={v.case_book_id} disabled={busy}
+            invalid={!!errs.case_book_id} describedBy={errs.case_book_id ? 'case_book_id-err' : undefined}
+            style={{ borderColor: errs.case_book_id ? '#C0392B' : undefined }}
+            onChange={val => { bookTouched.current = true; set('case_book_id')(val); }} onAddingChange={setAddingBook} />
+        </FieldWrap>
+      )}
 
       {activeKind === 'behavioral' && types.data && (
         <StorySelect value={v.story_id} onChange={set('story_id')} typeId={v.question_type_id} disabled={busy} error={errs.story_id} />
@@ -653,7 +681,7 @@ function SessionForm({ initial, submitLabel, busy, onSubmit, cancelHref, serverE
 
       <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-2">
         <Link href={cancelHref} data-testid="link-cancel" className="ip-focus min-h-11 px-5 rounded-lg inline-flex items-center justify-center font-semibold border bg-white">Cancel</Link>
-        <button type="submit" disabled={busy || addingType} data-testid="button-save-session"
+        <button type="submit" disabled={busy || addingType || (addingBook && activeKind === 'case')} data-testid="button-save-session"
           className="ip-focus min-h-11 px-6 rounded-lg font-semibold text-white inline-flex items-center justify-center gap-2 disabled:opacity-70 active:scale-[0.99] transition-transform"
           style={{ background: 'var(--navy)', borderBottom: '3px solid var(--green)' }}>
           {busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}{busy ? 'Saving...' : submitLabel}
@@ -700,7 +728,7 @@ export function NewSessionPage() {
       {waiting ? (
         <div className="mt-6 space-y-4" aria-busy="true"><span className="sr-only" role="status">Loading story</span><div className="ip-skel h-96 rounded-xl" /></div>
       ) : (
-      <SessionForm key={prefillOk ? `story-${sd?.id}` : 'blank'} initial={initial} submitLabel="Save session" busy={create.isPending} cancelHref={prefillOk && sd ? `/stories/${sd.id}` : '/sessions'} serverErrors={srvErr}
+      <SessionForm key={prefillOk ? `story-${sd?.id}` : 'blank'} defaultLatestBook initial={initial} submitLabel="Save session" busy={create.isPending} cancelHref={prefillOk && sd ? `/stories/${sd.id}` : '/sessions'} serverErrors={srvErr}
         onSubmit={(data) => create.mutate({ data }, {
           onSuccess: (s) => {
             qc.setQueryData(detailKey(s.id, user?.id), s);
@@ -720,6 +748,7 @@ const toVals = (s: PracticeSessionDetail): FormVals => ({
   overall_score: String(s.overall_score), duration_minutes: s.duration_minutes == null ? '' : String(s.duration_minutes),
   went_well: s.went_well ?? '', to_improve: s.to_improve ?? '',
   story_id: s.kind === 'behavioral' && s.story_id != null ? String(s.story_id) : '',
+  case_book_id: s.kind === 'case' && s.case_book_id != null ? String(s.case_book_id) : '',
 });
 
 export function EditSessionPage({ rawId }: { rawId?: string }) {
