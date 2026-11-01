@@ -73,12 +73,12 @@ test('private practice-session CRUD and validation', async t => {
     });
     await t.test('validates every field on create and update without changing existing data', async () => {
       const cases = {
-        session_date: [null, '', '2026-02-29', '2026-04-31', '0000-01-01', 'not-a-date', '2026-1-1'],
+        session_date: [null, '', '2026-02-29', '2026-04-31', '0000-01-01', 'not-a-date', '2026-1-1', '9999-12-31'],
         question_type_id: [null, '', 0, -1, 1.2, 2147483648, 2147483647],
         prompt: [null, '', '  \n ', 123, 'a'.repeat(4001)],
         format: [null, '', 'phone'],
         overall_score: [null, '', '3', 0, 6, 1.5],
-        duration_minutes: [-1, 1.5, '30', 2147483648],
+        duration_minutes: [-1, 0, 601, 1.5, '30', '', 2147483648],
         went_well: [123, 'a'.repeat(4001)],
         to_improve: [[], 'a'.repeat(4001)],
       };
@@ -92,10 +92,43 @@ test('private practice-session CRUD and validation', async t => {
       }
       for (const field of ['session_date', 'question_type_id', 'prompt', 'format', 'overall_score']) {
         const body = { ...valid }; delete body[field];
-        assert.ok((await write('post', a, '/api/sessions', body).expect(400)).body.errors[field]);
+        for (const [method, path] of [['post', '/api/sessions'], ['put', `/api/sessions/${saved.id}`]]) {
+          assert.ok((await write(method, a, path, body).expect(400)).body.errors[field]);
+        }
       }
       assert.equal((await a.agent.get('/api/sessions').expect(200)).body.length, 1);
       assert.deepEqual((await a.agent.get(`/api/sessions/${saved.id}`).expect(200)).body, saved);
+    });
+    await t.test('returns exact friendly field errors and rejects a direct logged-in blank-prompt request', async () => {
+      const response = await write('post', a, '/api/sessions', { ...valid, prompt: '   \n  ' }).expect(400);
+      assert.deepEqual(response.body, { errors: { prompt: 'Please describe the case or question you practiced.' } });
+      t.diagnostic(`Direct authenticated POST /api/sessions with whitespace-only prompt: HTTP ${response.status} ${JSON.stringify(response.body)}`);
+      for (const [method, path] of [['post', '/api/sessions'], ['put', `/api/sessions/${saved.id}`]]) {
+        const invalid = await write(method, a, path, {
+          ...valid, session_date: '', question_type_id: 2147483647, prompt: ' ',
+          overall_score: 2.5, duration_minutes: 601,
+        }).expect(400);
+        assert.deepEqual(invalid.body.errors, {
+          session_date: 'Please pick the date of your session.',
+          question_type_id: 'Please choose a question type.',
+          prompt: 'Please describe the case or question you practiced.',
+          overall_score: 'Please give this session an overall score from 1 to 5.',
+          duration_minutes: 'Duration should be a whole number of minutes, like 30.',
+        });
+        const future = await write(method, a, path, { ...valid, session_date: '9999-12-31' }).expect(400);
+        assert.equal(future.body.errors.session_date, "The date can't be in the future.");
+      }
+      assert.equal((await a.agent.get('/api/sessions').expect(200)).body.length, 1);
+      assert.deepEqual((await a.agent.get(`/api/sessions/${saved.id}`).expect(200)).body, saved);
+    });
+    await t.test('accepts today, trimmed prompts, and the duration upper boundary', async () => {
+      const result = await write('post', a, '/api/sessions', {
+        ...valid, session_date: new Date().toISOString().slice(0, 10),
+        duration_minutes: 600, prompt: '  Boundary validation  ',
+      }).expect(201);
+      assert.equal(result.body.duration_minutes, 600);
+      assert.equal(result.body.prompt, 'Boundary validation');
+      await write('delete', a, `/api/sessions/${result.body.id}`).expect(204);
     });
     await t.test('updates existing row, changes kind, and clears optional values persistently', async () => {
       const edited = {
@@ -115,8 +148,8 @@ test('private practice-session CRUD and validation', async t => {
       assert.equal((await a.agent.get('/api/sessions').expect(200)).body.length, 1);
       assert.deepEqual((await a.agent.get(`/api/sessions/${saved.id}`).expect(200)).body, result.body);
     });
-    await t.test('supports omitted optional fields, zero minutes, score bounds and newest-first list', async () => {
-      for (const [date, score, minutes] of [['2025-01-01', 1, 0], ['2026-01-01', 5, undefined]]) {
+    await t.test('supports omitted optional fields, minimum minutes, score bounds and newest-first list', async () => {
+      for (const [date, score, minutes] of [['2025-01-01', 1, 1], ['2026-01-01', 5, undefined]]) {
         const { duration_minutes: _m, went_well: _w, to_improve: _t, ...required } = valid;
         const result = await write('post', a, '/api/sessions', {
           ...required, session_date: date, overall_score: score, duration_minutes: minutes,

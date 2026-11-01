@@ -8,6 +8,6 @@
 import type { SessionValidationErrorErrors } from './sessionValidationErrorErrors';
 
 export interface SessionValidationError {
-  message: string;
+  message?: string;
   errors: SessionValidationErrorErrors;
 }

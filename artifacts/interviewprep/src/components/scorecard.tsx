@@ -55,14 +55,16 @@ function RetryBox({ msg, busy, onRetry }: { msg: string; busy: boolean; onRetry:
   );
 }
 
-export function ScorecardEditor({ drafts, onChange, disabled, query }: {
+export function ScorecardEditor({ drafts, onChange, disabled, query, error }: {
   drafts: ScoreDrafts; onChange: (d: ScoreDrafts) => void; disabled?: boolean;
   query: ReturnType<typeof useCaseSections>;
+  error?: string;
 }) {
   const sections = sorted(query.data);
   const patch = (id: number, p: Partial<ScoreDraft>) => onChange({ ...drafts, [id]: { ...(drafts[id] ?? BLANK), ...p } });
   return (
-    <fieldset className="space-y-3" data-testid="section-scorecard">
+    <fieldset className="space-y-3" data-testid="section-scorecard"
+      style={error ? { outline: '1px solid #C0392B', outlineOffset: 4, borderRadius: 8 } : undefined}>
       <legend className="text-sm font-semibold">Scorecard<span className="ml-1.5 font-normal text-muted-foreground">(rate each section, or leave N/A)</span></legend>
       {query.isLoading ? (
         <div className="space-y-2" aria-busy="true"><span className="sr-only" role="status">Loading case sections</span>
@@ -124,6 +126,9 @@ export function ScorecardEditor({ drafts, onChange, disabled, query }: {
           })}
         </ol>
       )}
+      {error && <div tabIndex={-1} aria-invalid="true" aria-describedby="section-scores-error">
+        <p id="section-scores-error" role="alert" className="text-sm font-medium" style={{ color: '#C0392B' }}>{error}</p>
+      </div>}
     </fieldset>
   );
 }

@@ -51,11 +51,14 @@ export const SessionInputFormat = {
 
 export interface SessionInput {
   /**
-     * Scored sections only; omit N/A sections. Empty or omitted replaces all scores with none. Ignored for behavioral sessions.
+     * Scored sections only; omit N/A sections. Empty or omitted replaces all scores with none. Nonempty scores are rejected for behavioral sessions. Sections must exist and cannot repeat.
      * @maxItems 7
      */
   section_scores?: SectionScoreInput[];
-  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  /**
+     * Required valid calendar date, not in the future.
+     * @pattern ^\d{4}-\d{2}-\d{2}$
+     */
   session_date: string;
   /**
      * @minimum 1
@@ -63,6 +66,7 @@ export interface SessionInput {
      */
   question_type_id: number;
   /**
+     * Trimmed before validation; whitespace-only prompts are rejected.
      * @minLength 1
      * @maxLength 4000
      */
@@ -74,8 +78,8 @@ export interface SessionInput {
      */
   overall_score: number;
   /**
-     * @minimum 0
-     * @maximum 2147483647
+     * @minimum 1
+     * @maximum 600
      * @nullable
      */
   duration_minutes?: number | null;
@@ -113,7 +117,7 @@ export type PracticeSessionDetail = PracticeSession & {
 export type SessionValidationErrorErrors = {[key: string]: string};
 
 export interface SessionValidationError {
-  message: string;
+  message?: string;
   errors: SessionValidationErrorErrors;
 }
 

@@ -211,12 +211,13 @@ components:
       required: [session_date, question_type_id, prompt, format, overall_score]
       properties:
         section_scores:
-          description: Scored sections only; omit N/A sections. Empty or omitted replaces all scores with none. Ignored for behavioral sessions.
+          description: Scored sections only; omit N/A sections. Empty or omitted replaces all scores with none. Nonempty scores are rejected for behavioral sessions. Sections must exist and cannot repeat.
           type: array
           maxItems: 7
           items:
             $ref: "#/components/schemas/SectionScoreInput"
         session_date:
+          description: Required valid calendar date, not in the future.
           type: string
           pattern: '^\d{4}-\d{2}-\d{2}$'
         question_type_id:
@@ -224,6 +225,7 @@ components:
           minimum: 1
           maximum: 2147483647
         prompt:
+          description: Trimmed before validation; whitespace-only prompts are rejected.
           type: string
           minLength: 1
           maxLength: 4000
@@ -236,8 +238,8 @@ components:
           maximum: 5
         duration_minutes:
           type: [integer, "null"]
-          minimum: 0
-          maximum: 2147483647
+          minimum: 1
+          maximum: 600
         went_well:
           type: [string, "null"]
           maxLength: 4000
@@ -261,7 +263,7 @@ components:
               type: string
     SessionValidationError:
       type: object
-      required: [message, errors]
+      required: [errors]
       properties:
         message:
           type: string
