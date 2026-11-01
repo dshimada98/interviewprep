@@ -5,8 +5,16 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { ListSessionsKind } from './listSessionsKind';
+import type { ListSessionsScore } from './listSessionsScore';
+import type { ListSessionsSort } from './listSessionsSort';
 
 export type ListSessionsParams = {
+q?: string;
+kind?: ListSessionsKind;
+type?: number;
+score?: ListSessionsScore;
+sort?: ListSessionsSort;
 /**
  * When true, return only the current user's starred sessions.
  */

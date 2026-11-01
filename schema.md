@@ -1,4 +1,4 @@
-# InterviewPrep database schema — Features 1–6
+# InterviewPrep database schema — Features 1–7
 
 The application's SQL source of truth is
 `artifacts/interviewprep/server/schema.sql`. There are six product tables
@@ -203,7 +203,7 @@ same HTTP 404 response, including for updates and deletion.
 
 | Method | Endpoint | Result |
 | --- | --- | --- |
-| GET | `/api/sessions` | Current user's sessions, newest practice date first (creation time and ID break ties) |
+| GET | `/api/sessions` | Matching owned sessions plus the user's total count; newest date first by default |
 | POST | `/api/sessions` | Create and return a session with HTTP 201 |
 | GET | `/api/sessions/:id` | Return one owned session |
 | PUT | `/api/sessions/:id` | Replace editable fields on an owned session |
@@ -402,3 +402,49 @@ idempotency and concurrent retries, private ordered lists, boolean response
 values, preservation through edits, composite uniqueness, foreign keys, and
 both deletion cascades. `tests/data-isolation.test.ts` also asserts User B
 cannot star User A's session.
+
+## Finding sessions (Feature 7)
+
+GET `/api/sessions` returns an envelope, including on `/starred`:
+
+```json
+{
+  "sessions": [],
+  "total": 12
+}
+```
+
+`sessions` contains the matching rows in the requested order. `total` is the
+logged-in user's full session count before any search or filters. It remains
+available when nothing matches, and never includes another user's sessions.
+The query computes both from one ownership-scoped database snapshot.
+
+| Query parameter | Allowed values / behavior |
+| --- | --- |
+| `q` | Trimmed, case-insensitive literal keyword across prompt, overall notes, and section notes |
+| `kind` | `case` or `behavioral` |
+| `type` | An existing `question_type_id` |
+| `score` | `low` (1–2), `mid` (3), `high` (4–5), using overall score |
+| `sort` | `newest` (default), `oldest`, `highest`, `lowest` |
+| `starred` | `true` retains the starred-only behavior |
+
+All supplied filters combine with AND. Invalid values are ignored. Score sorts
+break ties by newest session date, then creation time and ID; oldest/newest
+sorts use the session date first. Section notes use `EXISTS`, so matching
+multiple section notes never duplicates a session.
+
+All user-supplied values are SQL parameters. LIKE metacharacters `%`, `_`, and
+backslash are escaped, so the search treats them literally. Sort SQL comes only
+from a fixed allowlist, not user input.
+
+The Sessions page waits about 300 ms after typing before requesting results.
+Search/filter/sort state lives in URL query parameters. Query caches include
+those parameters and the user ID; mutations invalidate every affected list
+variant. Star toggles update cached envelope rows optimistically without
+performing search or filtering in the browser.
+
+`server/session-finder.test.mjs` covers all searchable fields, literal special
+characters, duplicate prevention, combined filters, invalid parameters, sort
+ties, starred combinations, and private total counts. The root data-isolation
+test also asserts User B searching for User A's “Coffee chain” prompt gets zero
+results.

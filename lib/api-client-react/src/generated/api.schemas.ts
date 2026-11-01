@@ -5,12 +5,6 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
-export interface CaseSection {
-  id: number;
-  name: string;
-  display_order: number;
-}
-
 export interface SectionScoreInput {
   /**
      * @minimum 1
@@ -33,12 +27,6 @@ export interface SectionScoreInput {
      */
   to_improve?: string | null;
 }
-
-export type SectionScore = SectionScoreInput & {
-  id: number;
-  section_name: string;
-  display_order: number;
-};
 
 export type SessionInputFormat = typeof SessionInputFormat[keyof typeof SessionInputFormat];
 
@@ -111,6 +99,24 @@ export type PracticeSession = SessionInput & {
   created_at: string;
 };
 
+export interface SessionList {
+  sessions: PracticeSession[];
+  /** Total number of sessions owned by this user, before search or filters. */
+  total: number;
+}
+
+export interface CaseSection {
+  id: number;
+  name: string;
+  display_order: number;
+}
+
+export type SectionScore = SectionScoreInput & {
+  id: number;
+  section_name: string;
+  display_order: number;
+};
+
 export type PracticeSessionDetail = PracticeSession & {
   section_scores: SectionScore[];
 };
@@ -151,11 +157,43 @@ export interface HealthStatus {
 export type InvalidSessionResponse = SessionValidationError;
 
 export type ListSessionsParams = {
+q?: string;
+kind?: ListSessionsKind;
+type?: number;
+score?: ListSessionsScore;
+sort?: ListSessionsSort;
 /**
  * When true, return only the current user's starred sessions.
  */
 starred?: boolean;
 };
+
+export type ListSessionsKind = typeof ListSessionsKind[keyof typeof ListSessionsKind];
+
+
+export const ListSessionsKind = {
+  case: 'case',
+  behavioral: 'behavioral',
+} as const;
+
+export type ListSessionsScore = typeof ListSessionsScore[keyof typeof ListSessionsScore];
+
+
+export const ListSessionsScore = {
+  low: 'low',
+  mid: 'mid',
+  high: 'high',
+} as const;
+
+export type ListSessionsSort = typeof ListSessionsSort[keyof typeof ListSessionsSort];
+
+
+export const ListSessionsSort = {
+  newest: 'newest',
+  oldest: 'oldest',
+  highest: 'highest',
+  lowest: 'lowest',
+} as const;
 
 export type GetQuestionTypes401 = {
   message: string;

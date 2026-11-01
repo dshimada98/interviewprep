@@ -33,19 +33,40 @@ paths:
       security: [{sessionCookie: []}]
       parameters:
         - in: query
+          name: q
+          schema:
+            type: string
+        - in: query
+          name: kind
+          schema:
+            type: string
+            enum: [case, behavioral]
+        - in: query
+          name: type
+          schema:
+            type: integer
+        - in: query
+          name: score
+          schema:
+            type: string
+            enum: [low, mid, high]
+        - in: query
+          name: sort
+          schema:
+            type: string
+            enum: [newest, oldest, highest, lowest]
+        - in: query
           name: starred
           description: When true, return only the current user's starred sessions.
           schema:
             type: boolean
       responses:
         "200":
-          description: Current user's sessions, newest date first
+          description: Matching owned sessions and the user's total count before filters. Invalid parameters are ignored.
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/PracticeSession"
+                $ref: "#/components/schemas/SessionList"
     post:
       operationId: createSession
       security: [{sessionCookie: []}]
@@ -191,6 +212,17 @@ components:
       in: cookie
       name: interviewprep.sid
   schemas:
+    SessionList:
+      type: object
+      required: [sessions, total]
+      properties:
+        sessions:
+          type: array
+          items:
+            $ref: "#/components/schemas/PracticeSession"
+        total:
+          type: integer
+          description: Total number of sessions owned by this user, before search or filters.
     CaseSection:
       type: object
       required: [id, name, display_order]

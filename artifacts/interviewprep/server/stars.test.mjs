@@ -41,8 +41,8 @@ test('private, idempotent session stars and shared junction table', async t => {
       assert.equal(aOld.starred, false);
       assert.equal(aNew.starred, false);
       assert.equal((await a.agent.get(`/api/sessions/${aOld.id}`).expect(200)).body.starred, false);
-      assert.deepEqual((await a.agent.get('/api/sessions?starred=true').expect(200)).body, []);
-      assert.ok((await a.agent.get('/api/sessions').expect(200)).body.every(row => row.starred === false));
+      assert.deepEqual((await a.agent.get('/api/sessions?starred=true').expect(200)).body.sessions, []);
+      assert.ok((await a.agent.get('/api/sessions').expect(200)).body.sessions.every(row => row.starred === false));
     });
     await t.test('login and CSRF are required for both mutations', async () => {
       for (const method of ['post', 'delete']) {
@@ -78,10 +78,10 @@ test('private, idempotent session stars and shared junction table', async t => {
     await t.test('starred-only lists are private and ordered by session date, not star time', async () => {
       await write(a, 'post', starPath(aNew.id)).expect(204);
       await write(b, 'post', starPath(bSession.id)).expect(204);
-      const aStars = (await a.agent.get('/api/sessions?starred=true').expect(200)).body;
+      const aStars = (await a.agent.get('/api/sessions?starred=true').expect(200)).body.sessions;
       assert.deepEqual(aStars.map(row => row.id), [aNew.id, aOld.id]);
       assert.ok(aStars.every(row => row.starred === true));
-      assert.deepEqual((await b.agent.get('/api/sessions?starred=true').expect(200)).body.map(row => row.id), [bSession.id]);
+      assert.deepEqual((await b.agent.get('/api/sessions?starred=true').expect(200)).body.sessions.map(row => row.id), [bSession.id]);
       const updated = await write(a, 'put', `/api/sessions/${aOld.id}`, { ...input, prompt: 'Still starred after editing' }).expect(200);
       assert.equal(updated.body.starred, true);
       const foreignDelete = await write(b, 'delete', starPath(aOld.id)).expect(404);
@@ -93,8 +93,8 @@ test('private, idempotent session stars and shared junction table', async t => {
       await write(a, 'delete', starPath(aOld.id)).expect(204);
       assert.equal((await rows(a.id, aOld.id)).length, 0);
       assert.equal((await a.agent.get(`/api/sessions/${aOld.id}`).expect(200)).body.starred, false);
-      assert.equal((await a.agent.get('/api/sessions').expect(200)).body.find(row => row.id === aOld.id).starred, false);
-      assert.deepEqual((await a.agent.get('/api/sessions?starred=true').expect(200)).body.map(row => row.id), [aNew.id]);
+      assert.equal((await a.agent.get('/api/sessions').expect(200)).body.sessions.find(row => row.id === aOld.id).starred, false);
+      assert.deepEqual((await a.agent.get('/api/sessions?starred=true').expect(200)).body.sessions.map(row => row.id), [aNew.id]);
     });
     await t.test('composite primary key enforces uniqueness and both foreign keys enforce valid references', async () => {
       await assert.rejects(pool.query('INSERT INTO stars (user_id,session_id) VALUES ($1,$2)', [a.id, aNew.id]),
@@ -110,7 +110,7 @@ test('private, idempotent session stars and shared junction table', async t => {
       await write(a, 'delete', `/api/sessions/${aNew.id}`).expect(204);
       assert.equal((await rows(a.id, aNew.id)).length, 0);
       assert.equal((await rows(b.id, bSession.id)).length, 1);
-      assert.deepEqual((await a.agent.get('/api/sessions?starred=true').expect(200)).body, []);
+      assert.deepEqual((await a.agent.get('/api/sessions?starred=true').expect(200)).body.sessions, []);
     });
     await t.test('deleting a user cascades their junction rows even when the practice session remains', async () => {
       const c = await account();

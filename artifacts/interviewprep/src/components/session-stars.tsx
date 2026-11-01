@@ -1,9 +1,9 @@
 import { useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Star } from 'lucide-react';
-import { useStarSession, useUnstarSession, type PracticeSession, type PracticeSessionDetail } from '@workspace/api-client-react';
+import { useStarSession, useUnstarSession, type PracticeSession, type PracticeSessionDetail, type SessionList } from '@workspace/api-client-react';
 import { sessionRequestOptions, useAuth } from '@/auth';
-import { detailKey, listKey, starredKey, statusOf } from './session-keys';
+import { detailKey, invalidateLists, isListQuery, paramsOfKey, statusOf } from './session-keys';
 
 /* ---------------- Stars ---------------- */
 
@@ -24,16 +24,35 @@ export function useStarToggle() {
   const [pending, setPending] = useState<Record<number, boolean>>({});
   const [errors, setErrors] = useState<Record<number, string>>({});
 
-  // Patch only the one session in each cache so concurrent toggles on other cards are never overwritten.
-  function apply(s: PracticeSession, on: boolean, uid?: number) {
-    const patch = <T extends PracticeSession>(x: T): T => (x.id === s.id ? { ...x, starred: on } : x);
-    qc.setQueryData<PracticeSession[]>(listKey(uid), old => old?.map(patch));
+  // Patch only the one session in each cached list variant so concurrent toggles on other cards are
+  // never overwritten. Never re-run search in the browser: matching rows are patched in place, unstarred
+  // rows leave starred variants (remembering their position for rollback), and a newly starred row is
+  // only inserted into the plain starred list, where it is known to match. Totals never change.
+  type Removed = Map<string, number>;
+  function apply(s: PracticeSession, on: boolean, uid?: number, restore?: Removed): Removed {
+    const removed: Removed = new Map();
+    for (const [key, old] of qc.getQueriesData<SessionList>({ predicate: isListQuery(uid) })) {
+      if (!old) continue;
+      const p = paramsOfKey(key);
+      const hash = JSON.stringify(key);
+      const idx = old.sessions.findIndex(x => x.id === s.id);
+      if (p.starred && !on) {
+        if (idx >= 0) { removed.set(hash, idx); qc.setQueryData<SessionList>(key, { ...old, sessions: old.sessions.filter(x => x.id !== s.id) }); }
+      } else if (idx >= 0) {
+        qc.setQueryData<SessionList>(key, { ...old, sessions: old.sessions.map(x => (x.id === s.id ? { ...x, starred: on } : x)) });
+      } else if (p.starred && on) {
+        const at = restore?.get(hash);
+        const row = { ...s, starred: true };
+        if (at !== undefined) {
+          const next = [...old.sessions]; next.splice(Math.min(at, next.length), 0, row);
+          qc.setQueryData<SessionList>(key, { ...old, sessions: next });
+        } else if (Object.keys(p).length === 1) {
+          qc.setQueryData<SessionList>(key, { ...old, sessions: [...old.sessions, row].sort(byNewest) });
+        }
+      }
+    }
     qc.setQueryData<PracticeSessionDetail>(detailKey(s.id, uid), old => (old ? { ...old, starred: on } : old));
-    qc.setQueryData<PracticeSession[]>(starredKey(uid), old => {
-      if (!old) return old;
-      const rest = old.filter(x => x.id !== s.id);
-      return on ? [...rest, { ...s, starred: true }].sort(byNewest) : rest;
-    });
+    return removed;
   }
 
   async function toggle(s: PracticeSession) {
@@ -44,12 +63,15 @@ export function useStarToggle() {
     const next = !s.starred;
     setPending(p => ({ ...p, [s.id]: true }));
     setErrors(e => { const n = { ...e }; delete n[s.id]; return n; });
-    await Promise.all([listKey(uid), starredKey(uid), detailKey(s.id, uid)].map(queryKey => qc.cancelQueries({ queryKey, exact: true })));
-    apply(s, next, uid);
+    await Promise.all([
+      qc.cancelQueries({ predicate: isListQuery(uid) }),
+      qc.cancelQueries({ queryKey: detailKey(s.id, uid), exact: true }),
+    ]);
+    const removed = apply(s, next, uid);
     try {
       await (next ? starRef.current : unstarRef.current)({ id: s.id });
     } catch (e) {
-      apply(s, !next, uid);
+      apply(s, !next, uid, removed);
       setErrors(er => ({ ...er, [s.id]: STAR_ERROR }));
       if (statusOf(e) === 401) void refresh();
     } finally {
@@ -58,8 +80,7 @@ export function useStarToggle() {
       // Refetch lists only once no toggle for this user is pending, so a refetch cannot
       // overwrite another session's optimistic state. A failed refetch keeps cached data.
       if (![...inflight].some(x => x.startsWith(`${uid}:`))) {
-        void qc.invalidateQueries({ queryKey: listKey(uid), exact: true });
-        void qc.invalidateQueries({ queryKey: starredKey(uid), exact: true });
+        void invalidateLists(qc, uid);
       }
       void qc.invalidateQueries({ queryKey: detailKey(s.id, uid), exact: true });
     }

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { pool } from './db.mjs';
 import { replaceSectionScores } from './case-sections.mjs';
 import { validateSession } from './session-validation.mjs';
+import { sessionListQuery } from './session-finder.mjs';
 const fields = `s.id, s.question_type_id, s.session_date::text, s.prompt, s.format,
   s.overall_score, s.duration_minutes, s.went_well, s.to_improve, s.created_at,
   q.name AS question_type_name, q.kind,
@@ -51,13 +52,8 @@ async function readSession(database, sessionId, userId) {
 
 export const practiceSessions = Router();
 practiceSessions.get('/', async (req, res) => {
-  const result = await pool.query(`SELECT ${fields} FROM practice_sessions s
-    JOIN question_types q ON q.id=s.question_type_id WHERE s.user_id=$1
-    AND ($2::boolean = false OR EXISTS (
-      SELECT 1 FROM stars st WHERE st.session_id=s.id AND st.user_id=$1
-    ))
-    ORDER BY s.session_date DESC, s.created_at DESC, s.id DESC`, [req.user.id, req.query.starred === 'true']);
-  res.json(result.rows);
+  const result = await pool.query(sessionListQuery(req.user.id, req.query, fields));
+  res.json(result.rows[0]);
 });
 practiceSessions.post('/', async (req, res) => {
   const saved = await sessionTransaction(async database => {

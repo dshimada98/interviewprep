@@ -76,14 +76,14 @@ test('case scorecard seeding, privacy, atomic replacement and database constrain
         [{ section_id: 2147483647, score: 3 }],
         [{ section_id: sections[0].id, score: 3 }, { section_id: sections[0].id, score: 4 }],
       ]) {
-        const count = (await a.agent.get('/api/sessions').expect(200)).body.length;
+        const count = (await a.agent.get('/api/sessions').expect(200)).body.sessions.length;
         for (const [method, path] of [['post', '/api/sessions'], ['put', `/api/sessions/${session.id}`]]) {
           const rejected = await write(a, method, path, {
             ...base, prompt: 'Must not overwrite', section_scores,
           }).expect(400);
           assert.equal(rejected.body.errors.section_scores, 'Section scores must be between 1 and 5.');
         }
-        assert.equal((await a.agent.get('/api/sessions').expect(200)).body.length, count);
+        assert.equal((await a.agent.get('/api/sessions').expect(200)).body.sessions.length, count);
         assert.deepEqual((await a.agent.get(`/api/sessions/${session.id}`).expect(200)).body, session);
       }
     });
