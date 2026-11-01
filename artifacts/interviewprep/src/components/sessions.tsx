@@ -65,7 +65,7 @@ function Shell({ children, title }: { children: ReactNode; title: string }) {
 
 function ErrText({ children, id }: { children: ReactNode; id?: string }) {
   return (
-    <p id={id} role="alert" className="flex items-start gap-2 text-sm font-medium" style={{ color: 'var(--score-1)' }}>
+    <p id={id} role="alert" className="flex items-start gap-2 text-sm font-medium" style={{ color: '#C0392B' }}>
       <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" aria-hidden /><span>{children}</span>
     </p>
   );
@@ -318,9 +318,10 @@ export function SessionDetailPage({ rawId }: { rawId?: string }) {
 /* ---------------- Form ---------------- */
 
 type FormVals = { scores?: ScoreDrafts; session_date: string; question_type_id: string; prompt: string; format: string; overall_score: string; duration_minutes: string; went_well: string; to_improve: string };
-type Errs = Partial<Record<Exclude<keyof FormVals, 'scores'> | 'form', string>>;
+type Errs = Partial<Record<Exclude<keyof FormVals, 'scores'> | 'section_scores' | 'form', string>>;
 const EMPTY: FormVals = { session_date: '', question_type_id: '', prompt: '', format: '', overall_score: '', duration_minutes: '', went_well: '', to_improve: '' };
-const SAVE_ERROR = "Couldn't save. Please check your entries.";
+const SAVE_ERROR = "Couldn't save your session. Please try again.";
+const FIX_FIELDS = 'Please fix the highlighted fields.';
 
 function today() {
   const d = new Date();
@@ -335,35 +336,40 @@ function realDate(v: string) {
 function validate(v: FormVals, typeIds: Set<number>): [Errs, SessionInput | null] {
   const e: Errs = {};
   const date = v.session_date.trim();
-  if (!date) e.session_date = 'Enter the session date.';
-  else if (!realDate(date)) e.session_date = 'Enter a real calendar date (YYYY-MM-DD).';
+  if (!date || !realDate(date)) e.session_date = 'Please pick the date of your session.';
+  else if (date > today()) e.session_date = "The date can't be in the future.";
   const qt = Number(v.question_type_id);
-  if (!v.question_type_id) e.question_type_id = 'Choose a question type.';
-  else if (!typeIds.has(qt)) e.question_type_id = 'Choose a valid question type.';
+  if (!v.question_type_id || !typeIds.has(qt)) e.question_type_id = 'Please choose a question type.';
   const prompt = v.prompt.trim();
-  if (!prompt) e.prompt = 'Enter the prompt you practiced.';
+  if (!prompt) e.prompt = 'Please describe the case or question you practiced.';
   else if (prompt.length > 4000) e.prompt = 'Prompt must be 4000 characters or fewer.';
-  if (!FORMATS.some(f => f.v === v.format)) e.format = 'Choose a format.';
+  if (!FORMATS.some(f => f.v === v.format)) e.format = 'Please choose solo, partner, or mock.';
   const sc = Number(v.overall_score);
-  if (!v.overall_score) e.overall_score = 'Choose an overall score.';
-  else if (!Number.isInteger(sc) || sc < 1 || sc > 5) e.overall_score = 'Score must be a whole number from 1 to 5.';
+  if (!v.overall_score || !Number.isInteger(sc) || sc < 1 || sc > 5) e.overall_score = 'Please give this session an overall score from 1 to 5.';
   const dur = v.duration_minutes.trim();
   let durN: number | null = null;
   if (dur) {
-    if (!/^\d+$/.test(dur) || Number(dur) > MAX_INT) e.duration_minutes = `Duration must be a whole number from 0 to ${MAX_INT}.`;
+    if (!/^\d+$/.test(dur) || Number(dur) < 1 || Number(dur) > 600) e.duration_minutes = 'Duration should be a whole number of minutes, like 30.';
     else durN = Number(dur);
   }
   const ww = v.went_well.trim(), ti = v.to_improve.trim();
   if (ww.length > 4000) e.went_well = 'Must be 4000 characters or fewer.';
   if (ti.length > 4000) e.to_improve = 'Must be 4000 characters or fewer.';
-  if (Object.keys(e).length) return [{ form: SAVE_ERROR }, null];
+  if (Object.keys(e).length) return [e, null];
   return [e, {
     session_date: date, question_type_id: qt, prompt, format: v.format as SessionInput['format'], overall_score: sc,
     duration_minutes: durN, went_well: ww || null, to_improve: ti || null,
   }];
 }
 
-function serverErrs(_err: unknown): Errs {
+function serverErrs(err: unknown): Errs {
+  if (statusOf(err) === 400 && err && typeof err === 'object' && 'data' in err) {
+    const data = err.data as { errors?: Record<string, unknown> } | null;
+    const allowed = [...Object.keys(EMPTY), 'section_scores'];
+    const errors = Object.fromEntries(Object.entries(data?.errors ?? {})
+      .filter(([key, value]) => allowed.includes(key) && typeof value === 'string')) as Errs;
+    if (Object.keys(errors).length) return errors;
+  }
   return { form: SAVE_ERROR };
 }
 
@@ -380,7 +386,7 @@ function FieldWrap({ id, label, optional, error, hint, children }: { id: string;
 }
 const aria = (id: string, error?: string, hint?: boolean) => ({
   id, 'aria-invalid': !!error, 'aria-describedby': error ? `${id}-err` : hint ? `${id}-hint` : undefined,
-  style: { borderColor: error ? 'var(--score-1)' : undefined },
+  style: { borderColor: error ? '#C0392B' : undefined },
 });
 
 function SessionForm({ initial, submitLabel, busy, onSubmit, cancelHref, serverErrors }: {
@@ -395,10 +401,20 @@ function SessionForm({ initial, submitLabel, busy, onSubmit, cancelHref, serverE
   const sections = useCaseSections();
   use401(sections.error);
   const formRef = useRef<HTMLFormElement>(null);
-  useEffect(() => { if (Object.keys(serverErrors).length) setErrs(serverErrors); }, [serverErrors]);
+  const focusErrors = useRef(false);
   useEffect(() => {
-    if (!Object.keys(errs).length) return;
-    formRef.current?.querySelector<HTMLElement>('[data-testid="status-form-error"]')?.focus();
+    if (Object.keys(serverErrors).length) {
+      focusErrors.current = true;
+      setErrs(serverErrors);
+    }
+  }, [serverErrors]);
+  useEffect(() => {
+    if (!focusErrors.current || !Object.keys(errs).length) return;
+    focusErrors.current = false;
+    const target = formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]:not(fieldset)') ??
+      formRef.current?.querySelector<HTMLElement>('[data-testid="status-form-error"]');
+    target?.focus({ preventScroll: true });
+    (target?.closest('label') ?? target)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
   }, [errs]);
 
   const types = useGetQuestionTypes({
@@ -408,18 +424,33 @@ function SessionForm({ initial, submitLabel, busy, onSubmit, cancelHref, serverE
   use401(types.error);
   // Editing infers the initial kind from the saved type once reference data loads.
   const activeKind = kind ?? (types.data?.behavioral.some(t => String(t.id) === initial.question_type_id) ? 'behavioral' : 'case');
-  const set = (k: Exclude<keyof FormVals, 'scores'>) => (val: string) => setV(p => ({ ...p, [k]: val }));
+  const set = (k: Exclude<keyof FormVals, 'scores'>) => (val: string) => {
+    const next = { ...v, [k]: val };
+    setV(next);
+    const [remaining] = validate(next, new Set((types.data?.[activeKind] ?? []).map(t => t.id)));
+    setErrs(previous => {
+      if (!previous[k] || remaining[k]) return previous;
+      const updated = { ...previous };
+      delete updated[k];
+      return updated;
+    });
+  };
 
   function submit(e: FormEvent) {
     e.preventDefault();
     if (busy) return;
     const ids = new Set((types.data?.[activeKind] ?? []).map(t => t.id));
     const [er, input] = validate(v, ids);
-    if (!input) { setErrs(er); return; }
+    if (!input) { focusErrors.current = true; setErrs(er); return; }
     if (activeKind === 'behavioral') { setErrs({}); onSubmit({ ...input, section_scores: [] }); return; }
     // Never submit a case without the reference list; the scorecard shows a retry.
     const sc = sections.data ? draftsToInput(drafts, sections.data) : null;
-    if (!sc) { setErrs({ form: SAVE_ERROR }); return; }
+    if (!sc) {
+      focusErrors.current = true;
+      setErrs(sections.data ? { section_scores: 'Please use 4,000 characters or fewer for section notes.' }
+        : { form: 'Please load the case sections before saving.' });
+      return;
+    }
     setErrs({});
     onSubmit({ ...input, section_scores: sc });
   }
@@ -428,7 +459,7 @@ function SessionForm({ initial, submitLabel, busy, onSubmit, cancelHref, serverE
 
   return (
     <form ref={formRef} noValidate onSubmit={submit} className="ip-rise mt-6 rounded-xl p-5 sm:p-8 space-y-6" style={{ background: 'var(--panel)' }}>
-      {errs.form && <div tabIndex={-1} className="rounded-lg bg-white border-l-4 p-3" style={{ borderColor: 'var(--score-1)' }} data-testid="status-form-error"><ErrText>{errs.form}</ErrText></div>}
+      {Object.keys(errs).length > 0 && <div tabIndex={-1} className="rounded-lg bg-white border-l-4 p-3" style={{ borderColor: '#C0392B' }} data-testid="status-form-error"><ErrText>{Object.keys(errs).some(k => k !== 'form') ? FIX_FIELDS : errs.form}</ErrText></div>}
 
       <div role="radiogroup" aria-label="Practice kind" className="grid grid-cols-2 gap-2">
         {(['case', 'behavioral'] as const).map(k => (
@@ -440,6 +471,11 @@ function SessionForm({ initial, submitLabel, busy, onSubmit, cancelHref, serverE
               if (activeKind !== k) {
                 setKind(k);
                 setV(p => ({ ...p, question_type_id: '' }));
+                setErrs(previous => {
+                  const next = { ...previous };
+                  delete next.section_scores;
+                  return next;
+                });
               }
             }}>{k === 'case' ? 'Case' : 'Behavioral'}</button>
         ))}
@@ -481,9 +517,9 @@ function SessionForm({ initial, submitLabel, busy, onSubmit, cancelHref, serverE
             const on = v.format === f.v;
             return (
               <label key={f.v} className="min-h-11 flex items-center gap-2.5 rounded-lg border bg-white px-3.5 cursor-pointer has-[:focus-visible]:outline has-[:focus-visible]:outline-[3px] has-[:focus-visible]:outline-[color:var(--green)]"
-                style={{ borderColor: on ? 'var(--navy)' : errs.format ? 'var(--score-1)' : undefined, boxShadow: on ? 'inset 0 0 0 1px var(--navy)' : undefined }}>
+                style={{ borderColor: errs.format ? '#C0392B' : on ? 'var(--navy)' : undefined, boxShadow: on ? 'inset 0 0 0 1px var(--navy)' : undefined }}>
                 <input type="radio" name="format" value={f.v} checked={on} onChange={() => set('format')(f.v)} data-testid={`radio-format-${f.v}`}
-                  aria-invalid={!!errs.format} className="h-4 w-4 accent-[color:var(--navy)]" />
+                  aria-invalid={!!errs.format} aria-describedby={errs.format ? 'format-err' : undefined} className="h-4 w-4 accent-[color:var(--navy)]" />
                 <span className="font-medium">{f.label}</span>
               </label>
             );
@@ -499,9 +535,9 @@ function SessionForm({ initial, submitLabel, busy, onSubmit, cancelHref, serverE
             const on = v.overall_score === String(n);
             return (
               <label key={n} className="min-h-14 flex flex-col items-center justify-center rounded-lg border bg-white cursor-pointer transition-colors has-[:focus-visible]:outline has-[:focus-visible]:outline-[3px] has-[:focus-visible]:outline-[color:var(--green)]"
-                style={on ? { background: `var(--score-${n})`, borderColor: `var(--score-${n})`, color: 'white' } : { borderColor: errs.overall_score ? 'var(--score-1)' : undefined }}>
+                style={on ? { background: `var(--score-${n})`, borderColor: errs.overall_score ? '#C0392B' : `var(--score-${n})`, color: 'white' } : { borderColor: errs.overall_score ? '#C0392B' : undefined }}>
                 <input type="radio" name="overall_score" value={n} checked={on} onChange={() => set('overall_score')(String(n))}
-                  data-testid={`radio-score-${n}`} aria-invalid={!!errs.overall_score} className="sr-only" aria-label={`${n}, ${SCORE_LABEL[n]}`} />
+                  data-testid={`radio-score-${n}`} aria-invalid={!!errs.overall_score} aria-describedby={errs.overall_score ? 'score-err' : undefined} className="sr-only" aria-label={`${n}, ${SCORE_LABEL[n]}`} />
                 <span className="text-lg font-bold tabular-nums leading-none">{n}</span>
                 <span className="mt-1 text-[10px] sm:text-xs font-medium hidden min-[400px]:block opacity-80">{SCORE_LABEL[n]}</span>
               </label>
@@ -511,7 +547,12 @@ function SessionForm({ initial, submitLabel, busy, onSubmit, cancelHref, serverE
         {errs.overall_score && <ErrText id="score-err">{errs.overall_score}</ErrText>}
       </fieldset>
 
-      {activeKind === 'case' && types.data && <ScorecardEditor drafts={drafts} onChange={setDrafts} disabled={busy} query={sections} />}
+      {activeKind === 'case' && types.data && <ScorecardEditor drafts={drafts} onChange={d => {
+        setDrafts(d);
+        if (sections.data && draftsToInput(d, sections.data)) {
+          setErrs(previous => { const next = { ...previous }; delete next.section_scores; return next; });
+        }
+      }} disabled={busy} query={sections} error={errs.section_scores} />}
 
       <FieldWrap id="duration_minutes" label="Duration in minutes" optional error={errs.duration_minutes} hint="Leave blank to clear.">
         <input {...aria('duration_minutes', errs.duration_minutes, true)} type="text" inputMode="numeric" data-testid="input-duration"

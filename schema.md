@@ -203,10 +203,10 @@ Session responses contain `id`, all editable fields, `question_type_name`,
 `kind`, and `created_at`. They do not expose `user_id`. `session_date` is a
 `YYYY-MM-DD` calendar-date string, without time-zone conversion.
 
-POST and PUT require `session_date` (a real calendar date), `question_type_id`
+POST and PUT require `session_date` (a real calendar date, not in the future), `question_type_id`
 (an existing shared type), nonblank `prompt`, `format` (`solo`, `partner`, or
 `mock`), and integer `overall_score` from 1 to 5. Optional `duration_minutes`
-is null or a nonnegative PostgreSQL-range integer. Optional `went_well` and
+is null or a whole number from 1 to 600. Optional `went_well` and
 `to_improve` are overall notes, not section feedback. Text is trimmed and
 limited to 4,000 characters per field. Omitted/blank optional notes and omitted
 or null minutes become SQL NULL; PUT can explicitly clear existing values.
@@ -216,12 +216,18 @@ Invalid fields return HTTP 400:
 
 ```json
 {
-  "message": "Please check the highlighted fields.",
-  "errors": {"overall_score": "Please choose a whole-number score from 1 to 5."}
+  "errors": {"overall_score": "Please give this session an overall score from 1 to 5."}
 }
 ```
 
 The UI performs matching inline checks and displays server field errors.
+Both POST and PUT use the shared server validator before writing any data.
+Invalid requests leave the parent session and all section scores unchanged.
+New and edit forms disable native validation bubbles, retain drafts, show red
+field messages and a summary, and scroll/focus the first invalid field on submit.
+Each field error clears once that field is corrected, without moving focus.
+Nonempty section scores are rejected for behavioral sessions; case section IDs
+must exist, cannot repeat, and must have whole-number scores from 1 to 5.
 The OpenAPI contract and generated React Query hooks live in `lib/api-spec`
 and `lib/api-client-react`. The Express router validates inputs before SQL and
 uses parameterized, ownership-scoped queries for every read and mutation.

@@ -1,74 +1,19 @@
 import { Router } from 'express';
-import { z } from 'zod/v4';
 import { pool } from './db.mjs';
 import { replaceSectionScores } from './case-sections.mjs';
-
-// Calendar dates stay date-only strings; never convert a local day to an instant.
-function calendarDate(value) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || value.startsWith('0000')) return false;
-  const date = new Date(`${value}T00:00:00Z`);
-  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
-}
-const integer = (min, max, message) => z.number({ error: message })
-  .int({ error: message }).min(min, { error: message }).max(max, { error: message });
-const notes = z.string({ error: 'Please enter text.' }).trim()
-  .max(4000, 'Please use 4,000 characters or fewer.').nullable().optional();
-const sectionScore = z.object({
-  section_id: integer(1, 2147483647, 'Invalid scorecard.'),
-  score: integer(1, 5, 'Invalid scorecard.'),
-  went_well: notes,
-  to_improve: notes,
-});
-const input = z.object({
-  section_scores: z.array(sectionScore).max(7).refine(
-    scores => new Set(scores.map(row => row.section_id)).size === scores.length,
-    'Invalid scorecard.',
-  ).optional().default([]),
-  session_date: z.string({ error: 'Please enter a valid date.' })
-    .refine(calendarDate, 'Please enter a valid date.'),
-  question_type_id: integer(1, 2147483647, 'Please choose a question type.'),
-  prompt: z.string({ error: 'Please enter a prompt.' }).trim()
-    .min(1, 'Please enter a prompt.').max(4000, 'Please use 4,000 characters or fewer.'),
-  format: z.enum(['solo', 'partner', 'mock'], { error: 'Please choose solo, partner, or mock.' }),
-  overall_score: integer(1, 5, 'Please choose a whole-number score from 1 to 5.'),
-  duration_minutes: integer(0, 2147483647, 'Please enter whole minutes, zero or greater.').nullable().optional(),
-  went_well: notes,
-  to_improve: notes,
-});
+import { validateSession } from './session-validation.mjs';
 const fields = `s.id, s.question_type_id, s.session_date::text, s.prompt, s.format,
   s.overall_score, s.duration_minutes, s.went_well, s.to_improve, s.created_at,
   q.name AS question_type_name, q.kind`;
 const notFound = res => res.status(404).json({ message: 'Session not found' });
 
 async function validated(body, res, database) {
-  const result = input.safeParse(body);
-  const errors = {};
-  if (!result.success) {
-    for (const issue of result.error.issues) {
-      const field = issue.path[0];
-      if (field && !errors[field]) errors[field] = issue.message;
-    }
-  } else {
-    const exists = await database.query('SELECT id, kind FROM question_types WHERE id=$1', [result.data.question_type_id]);
-    if (!exists.rowCount) errors.question_type_id = 'Please choose an available question type.';
-    if (exists.rows[0]?.kind === 'case' && result.data.section_scores.length) {
-      const sections = await database.query('SELECT id FROM case_sections WHERE id=ANY($1::integer[])',
-        [result.data.section_scores.map(row => row.section_id)]);
-      if (sections.rowCount !== result.data.section_scores.length) errors.section_scores = 'Invalid scorecard.';
-    }
-    if (!Object.keys(errors).length) {
-      const data = result.data;
-      return {
-        values: [data.question_type_id, data.session_date, data.prompt, data.format,
-          data.overall_score, data.duration_minutes ?? null, data.went_well || null, data.to_improve || null],
-        scores: exists.rows[0].kind === 'case' ? data.section_scores : [],
-      };
-    }
-  }
-  if (!result.success || Object.keys(errors).length) {
-    res.status(400).json({ message: 'Please check the highlighted fields.', errors });
+  const result = await validateSession(body, database);
+  if (result.errors) {
+    res.status(400).json({ errors: result.errors });
     return null;
   }
+  return result;
 }
 
 // Also used by tests to prove real PostgreSQL rollback on an insertion failure.

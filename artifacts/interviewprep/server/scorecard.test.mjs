@@ -76,9 +76,14 @@ test('case scorecard seeding, privacy, atomic replacement and database constrain
         [{ section_id: 2147483647, score: 3 }],
         [{ section_id: sections[0].id, score: 3 }, { section_id: sections[0].id, score: 4 }],
       ]) {
-        await write(a, 'put', `/api/sessions/${session.id}`, {
-          ...base, prompt: 'Must not overwrite', section_scores,
-        }).expect(400);
+        const count = (await a.agent.get('/api/sessions').expect(200)).body.length;
+        for (const [method, path] of [['post', '/api/sessions'], ['put', `/api/sessions/${session.id}`]]) {
+          const rejected = await write(a, method, path, {
+            ...base, prompt: 'Must not overwrite', section_scores,
+          }).expect(400);
+          assert.equal(rejected.body.errors.section_scores, 'Section scores must be between 1 and 5.');
+        }
+        assert.equal((await a.agent.get('/api/sessions').expect(200)).body.length, count);
         assert.deepEqual((await a.agent.get(`/api/sessions/${session.id}`).expect(200)).body, session);
       }
     });
@@ -130,16 +135,24 @@ test('case scorecard seeding, privacy, atomic replacement and database constrain
       assert.equal(new Set(saved.section_scores.map(row => row.section_id)).size, 7);
       assert.equal(new Set(saved.section_scores.map(row => row.score)).size, 1);
     });
-    await t.test('N/A removes rows and behavioral changes remove all section scores', async () => {
+    await t.test('N/A removes rows; behavioral sessions reject scores without saving', async () => {
       const cleared = await write(a, 'put', `/api/sessions/${session.id}`, { ...base, section_scores: [] }).expect(200);
       assert.deepEqual(cleared.body.section_scores, []);
       const restored = await write(a, 'put', `/api/sessions/${session.id}`, {
         ...base, section_scores: [{ section_id: sections[0].id, score: 3 }],
       }).expect(200);
       assert.equal(restored.body.section_scores.length, 1);
+      const before = (await a.agent.get(`/api/sessions/${session.id}`).expect(200)).body;
+      for (const [method, path] of [['post', '/api/sessions'], ['put', `/api/sessions/${session.id}`]]) {
+        const rejected = await write(a, method, path, {
+          ...base, question_type_id: types.behavioral[0].id,
+          section_scores: [{ section_id: sections[0].id, score: 5 }],
+        }).expect(400);
+        assert.deepEqual(rejected.body.errors, { section_scores: 'Section scores must be between 1 and 5.' });
+      }
+      assert.deepEqual((await a.agent.get(`/api/sessions/${session.id}`).expect(200)).body, before);
       const behavioral = await write(a, 'put', `/api/sessions/${session.id}`, {
-        ...base, question_type_id: types.behavioral[0].id,
-        section_scores: [{ section_id: sections[0].id, score: 5 }],
+        ...base, question_type_id: types.behavioral[0].id, section_scores: [],
       }).expect(200);
       assert.deepEqual(behavioral.body.section_scores, []);
       assert.equal((await pool.query('SELECT count(*)::int AS n FROM section_scores WHERE session_id=$1', [session.id])).rows[0].n, 0);
