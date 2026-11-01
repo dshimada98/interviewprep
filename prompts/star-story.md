@@ -1,5 +1,5 @@
 # Initial Prompt
-eatures 1-9 are done and merged. Now build ONLY Feature 10 (STAR story bank) from PLAN.md.
+Features 1-9 are done and merged. Now build ONLY Feature 10 (STAR story bank) from PLAN.md.
 
 NEW TABLE: stories (each row belongs to exactly one user)
 - id (primary key)
