@@ -166,12 +166,12 @@ export function SessionsListPage() {
           <h1 className="mt-2 text-3xl sm:text-4xl font-bold tracking-tight">Your sessions</h1>
         </div>
         <div className="flex flex-col sm:flex-row gap-2 sm:items-start">
-        <ExportButton />
         <Link href="/sessions/new" data-testid="link-new-session"
-          className="ip-focus ip-rise min-h-11 px-5 rounded-lg inline-flex items-center justify-center gap-2 font-semibold text-white"
-          style={{ background: 'var(--navy)', borderBottom: '3px solid var(--green)' }}>
-          <Plus className="h-4 w-4" aria-hidden />Log a session
+          className="ip-focus ip-rise min-h-11 w-full sm:w-auto px-5 rounded-lg inline-flex items-center justify-center gap-2 whitespace-nowrap font-semibold text-white"
+          style={{ background: '#2E9E6B', color: '#FFFFFF' }}>
+          + Log session
         </Link>
+        <ExportButton />
         </div>
       </div>
 

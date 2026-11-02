@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
@@ -7,6 +7,8 @@ import { pool } from '../server/db.mjs';
 
 const baseURL = process.env.TEST_BASE_URL || (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : null);
 if (!baseURL) throw new Error('Set TEST_BASE_URL to the running app URL.');
+
+after(async () => { await pool.end(); });
 
 test('phone and laptop: real signup, refresh, logout, validation and login', async () => {
   const browser = await chromium.launch({
@@ -97,7 +99,94 @@ test('phone and laptop: real signup, refresh, logout, validation and login', asy
     const ids = (await pool.query('SELECT id FROM users WHERE email=ANY($1::text[])', [emails])).rows.map(row => row.id);
     await pool.query("DELETE FROM login_sessions WHERE (sess->>'userId')::int=ANY($1::int[])", [ids]);
     await pool.query('DELETE FROM users WHERE id=ANY($1::int[])', [ids]);
-    await pool.end();
     await browser.close();
+  }
+});
+
+test('session logging is visible without opening the menu at 375px and remains primary on laptop', async () => {
+  const browser = await chromium.launch({
+    executablePath: process.env.CHROMIUM_PATH || execFileSync('which', ['chromium'], { encoding: 'utf8' }).trim(),
+    headless: true, args: ['--no-sandbox'],
+  });
+  const email = `log-primary-${randomUUID()}@example.test`;
+  const context = await browser.newContext({ baseURL, viewport: { width: 375, height: 812 } });
+  const page = await context.newPage();
+  async function assertFits() {
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
+  }
+  async function assertPrimary() {
+    const link = page.locator('main').getByRole('link', { name: '+ Log session', exact: true });
+    await expect(link).toBeVisible();
+    await expect(link).toBeInViewport({ ratio: 1 });
+    assert.ok(await link.evaluate(el => {
+      const box = el.getBoundingClientRect();
+      const style = getComputedStyle(el);
+      return box.height >= 44 && box.width >= 44
+        && style.backgroundColor === 'rgb(46, 158, 107)'
+        && style.color === 'rgb(255, 255, 255)';
+    }));
+    const secondary = page.getByRole('button', { name: 'Export to Excel', exact: true });
+    await expect(secondary).toBeVisible();
+    assert.ok(await link.evaluate((el, button) =>
+      Boolean(el.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING),
+    await secondary.elementHandle()));
+    await assertFits();
+    return link;
+  }
+  try {
+    const status = await context.request.get('/api/auth/status');
+    const { csrfToken } = await status.json();
+    const signup = await context.request.post('/api/auth/signup', {
+      headers: { 'X-CSRF-Token': csrfToken },
+      data: { email, password: 'primary-action-test-password!', confirmPassword: 'primary-action-test-password!' },
+    });
+    assert.equal(signup.status(), 201);
+    await page.goto('/dashboard');
+    await expect(page.getByRole('heading', { name: 'Dashboard', exact: true })).toBeVisible();
+    const menu = page.getByRole('button', { name: 'Open menu', exact: true });
+    await expect(menu).toHaveAttribute('aria-expanded', 'false');
+    const primary = await assertPrimary();
+    const headingBox = await page.getByRole('heading', { name: 'Dashboard', exact: true }).boundingBox();
+    const primaryBox = await primary.boundingBox();
+    assert.ok(primaryBox.y >= headingBox.y + headingBox.height);
+    assert.ok(Math.abs(primaryBox.width - await page.locator('main').evaluate(el => {
+      const style = getComputedStyle(el);
+      return el.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+    })) <= 2);
+    const compact = page.locator('header').getByRole('link', { name: /Log/ });
+    await expect(compact).toBeVisible();
+    assert.ok(await compact.evaluate(el => {
+      const box = el.getBoundingClientRect();
+      return box.height >= 44 && box.width >= 44;
+    }));
+    await primary.click();
+    await expect(page).toHaveURL(/\/sessions\/new$/);
+    await expect(page.getByRole('heading', { name: 'Log a session', exact: true })).toBeVisible();
+    await expect(page.locator('header').getByRole('link', { name: /Log/ })).toBeVisible();
+    await page.goto('/sessions');
+    await assertPrimary();
+    const download = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Export to Excel', exact: true }).click();
+    const workbook = await download;
+    assert.match(workbook.suggestedFilename(), /^InterviewPrep_\d{4}-\d{2}-\d{2}\.xlsx$/);
+    assert.equal(await workbook.failure(), null);
+    await workbook.delete();
+    await compact.click();
+    await expect(page).toHaveURL(/\/sessions\/new$/);
+    await page.setViewportSize({ width: 1366, height: 900 });
+    for (const route of ['/dashboard', '/sessions']) {
+      await page.goto(route);
+      const laptopPrimary = await assertPrimary();
+      const heading = await page.locator('main h1').boundingBox();
+      const action = await laptopPrimary.boundingBox();
+      assert.ok(action.x > heading.x + heading.width);
+      assert.ok(action.y < heading.y + heading.height && action.y + action.height > heading.y);
+    }
+  } finally {
+    await context.close();
+    await browser.close();
+    const ids = (await pool.query('SELECT id FROM users WHERE email=$1', [email])).rows.map(row => row.id);
+    await pool.query("DELETE FROM login_sessions WHERE (sess->>'userId')::int=ANY($1::int[])", [ids]);
+    await pool.query('DELETE FROM users WHERE id=ANY($1::int[])', [ids]);
   }
 });

@@ -210,7 +210,14 @@ export function DashboardPage() {
         <p className="ip-rise text-xs font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--green-text)' }}>Overview</p>
         <div className="mt-2 mb-6 sm:mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="ip-rise text-3xl sm:text-4xl font-bold tracking-tight">Dashboard</h1>
-          <ExportButton />
+          <div className="flex flex-col sm:flex-row gap-2 sm:items-start">
+            <Link href="/sessions/new" data-testid="link-dashboard-log-session"
+              className="ip-focus min-h-11 w-full sm:w-auto px-5 rounded-lg inline-flex items-center justify-center gap-2 whitespace-nowrap font-semibold text-white"
+              style={{ background: '#2E9E6B', color: '#FFFFFF' }}>
+              + Log session
+            </Link>
+            <ExportButton />
+          </div>
         </div>
 
         {d && <div className="mb-5"><NextCaseFocus focus={d.next_case_focus} scoreColor={bandColor} /></div>}
