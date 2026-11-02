@@ -64,3 +64,11 @@ asks to copy the note, not replace it with an abbreviated interpretation.
 
 **How to apply:** Keep the original note unchanged and make any shortening an
 explicit user action.
+
+A usability test found that a new user struggled to find how to log a session.
+
+**Why:** The user reported this finding as the reason for making session logging
+the primary action.
+
+**How to apply:** Preserve session-logging discoverability when changing navigation
+or page actions; do not treat export as the main practice workflow.

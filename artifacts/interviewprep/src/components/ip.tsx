@@ -208,10 +208,15 @@ export function AppHeader() {
           <span className="hidden xl:inline text-sm text-white/75 truncate max-w-[10rem]">{user?.email}</span>
           {btn}
         </div>
-        <button className="lg:hidden ip-focus h-11 w-11 grid place-items-center rounded-lg border border-white/30"
-          aria-label={open ? 'Close menu' : 'Open menu'} aria-expanded={open} aria-controls="mobile-menu" onClick={() => setOpen(!open)}>
-          {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-        </button>
+        <div className="lg:hidden flex items-center gap-2 shrink-0">
+          <Link href="/sessions/new" onClick={() => setOpen(false)} data-testid="link-header-log-session" aria-label="Log session"
+            className="ip-focus min-h-11 min-w-11 px-3 rounded-lg inline-flex items-center justify-center whitespace-nowrap font-semibold text-white"
+            style={{ background: '#2E9E6B', color: '#FFFFFF' }}>+ Log</Link>
+          <button className="ip-focus h-11 w-11 grid place-items-center rounded-lg border border-white/30"
+            aria-label={open ? 'Close menu' : 'Open menu'} aria-expanded={open} aria-controls="mobile-menu" onClick={() => setOpen(!open)}>
+            {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
+        </div>
       </div>
       {open && (
         <div id="mobile-menu" className="lg:hidden px-5 pb-4 space-y-3 ip-rise">
