@@ -129,3 +129,30 @@ erDiagram
 - **Least sure I can build:** The case scorecard (feature 4). It's one form that saves to two tables, with N/A handling, and editing must update existing section scores rather than duplicate them.
 - **Cut first:** If time runs short, I'll simplify Next-case focus (feature 9) to a single "weakest section" stat. Next, I'll drop the heatmap, since the bar chart already meets the dashboard requirement. If I'm still short after that, I'll drop the link between behavioral sessions and stories, so the story bank stands alone.
 - **Backlog (only if time allows):** A practice streak counter; tagging stories with multiple competencies; and a competency coverage view showing which competencies have no story yet.
+
+## 8. Plan vs Reality
+## Plan vs. Reality
+
+| Planned feature | Shipped / Changed / Cut | Status | Learning | What changed and why (one line) |
+|---|---|---|---|---|
+| 1. Sign up and login | Changed | Done | The agent surfaces decisions mid-build; I need to make them explicitly and log them. | Added a login-session table (agent recommended, I approved) and a special-character password rule (my call). |
+| 2. Data model | Changed | Done | Always read a PR's "Files changed" before merging. | After a failed Replit-to-GitHub sync I rebuilt on a v2 branch, and a separate agent task merged Features 3 and 5 into this PR (#15). |
+| 3. Create / read / update / delete | Changed | Done | Out-of-order work makes later PRs hard to read. | The session pages arrived early in #15, so PR #18 mostly added the data-isolation test. |
+| 4. Case scorecard | Shipped | Done | Naming the riskiest bug in the prompt (duplicate section scores) helped prevent it. | Built as planned: 7 sections, N/A support, notes per section. |
+| 5. Validation | Changed | Done | Validation must live on the server, not just the form. | Partly built early in #15; I added future-date and duration rules beyond the plan. |
+| 6. Stars | Shipped | Done | A composite key on user + session prevents duplicate stars at the database level. | Built as planned, with a "Starred" view as my redo list. |
+| 7. Find things | Changed | Done | My own user story exposed a gap in my plan. | Added a score filter and section-note search, because "profitability cases under 3" needed them (agent flagged it, I agreed). |
+| 8. Dashboard | Changed | Done | Check every view on a phone, not just a laptop. | Became the landing page with a case-only average, a behavioral count, and a section heatmap; the heatmap overflowed sideways on phones until fixed. |
+| 9. Next-case focus | Shipped | Done | Features that share data need to stay in sync. | Built as planned; known issue: a completed checklist item can still appear here as "On checklist" (backlogged). |
+| 10. STAR story bank | Changed | Done | Small shortcuts make a feature feel finished. | Added a "Practice this story" button; one main competency per story instead of multiple tags. |
+| Test: data isolation | Changed | Done | Each new feature is a new way to leak data. | Grew from 2 checks to cover search, stars, stories, custom types, case books, checklist, and export; red/green evidence added after merge. |
+| Test: dashboard average | Shipped | Done | A test is only proof once I've seen it fail. | Matches the plan's 3, 4, 5 → 4.0 scenario; red/green evidence added after merge. |
+| Practice streak | Cut | Backlogged | A feature I'd use beats a generic one. | Replaced by Next-case focus, which matches how I actually prep. |
+| Competency coverage view | Cut | Backlogged | Cutting early protected the timeline. | Not built. |
+| Multiple competency tags | Cut | Backlogged | Simpler data models ship faster. | One main competency per story. |
+| 11. More behavioral types + custom categories (added) | Added | Done | Test the "add your own" path, not just the list. | The original 6 types missed common fit questions; caught a bug where custom categories wouldn't save. |
+| 12. Case books (added) | Added | Done | Shared + private reference data is a reusable pattern. | I wanted performance by source; added publication year (my call) with editions tracked separately (agent suggestion). |
+| 13. Improvement checklist (added) | Added | Done | Check the branch name before every prompt. | The code was built on the case books branch by mistake and shipped in PR #33; PR #32 holds only the prompt. |
+| 14. Excel export (added) | Added | Done | Publishing can fail even when local tests pass. | I share progress with practice partners by email instead of a login; fixed a publish failure caused by excluded dependencies. |
+| Stranger-test fix: Log session as primary action (added) | Added | Done | New users show you what you've stopped noticing. | My tester wandered to find how to log a case; moved "+ Log session" beside the dashboard heading. |
+| Quick-entry form, progress-over-time comparison, scoring rubric | Cut | Backlogged | Fix the core action first. | Deferred after the stranger test; see Reflection 2. |
