@@ -590,6 +590,18 @@ describe('practice-session data isolation', () => {
     const profitability = types.body.case.find((type: { name: string }) => type.name === 'Profitability');
     expect(profitability).toBeDefined();
 
+    const beforeOtherUser = (await userA.agent.get('/api/dashboard').expect(200)).body.section_progress;
+    const sectionTypes = (await userB.agent.get('/api/case-sections').expect(200)).body;
+    const foreignCase = await userB.agent.post('/api/sessions').set('X-CSRF-Token', userB.csrfToken).send({
+      session_date: '2026-10-12', question_type_id: profitability.id, prompt: 'Private progress fixture',
+      format: 'solo', overall_score: 5,
+      section_scores: [{ section_id: sectionTypes[0].id, score: 5 }],
+    }).expect(201);
+    expect((await userA.agent.get('/api/dashboard').query({ range: 'all' }).expect(200)).body.section_progress)
+      .toEqual(beforeOtherUser);
+    // This test's existing empty-list assertions still exercise a new User B.
+    await userB.agent.delete(`/api/sessions/${foreignCase.body.id}`).set('X-CSRF-Token', userB.csrfToken).expect(204);
+
     const created = await userA.agent.post('/api/sessions')
       .set('X-CSRF-Token', userA.csrfToken)
       // Forged ownership must be ignored; identity comes from A's cookie.

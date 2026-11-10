@@ -2,7 +2,7 @@ import { pool } from './db.mjs';
 
 // One statement gives every tile and chart the same database snapshot.
 // All session and score aggregates descend from this ownership boundary.
-export async function getDashboard(userId, database = pool) {
+export async function getDashboard(userId, database = pool, range = 'last10') {
   const { rows } = await database.query(`
     WITH owned AS MATERIALIZED (
       SELECT p.*, q.kind
@@ -34,8 +34,57 @@ export async function getDashboard(userId, database = pool) {
       GROUP BY s.id, s.name, s.display_order
       ORDER BY average_score, scored_count DESC, s.display_order, s.id
       LIMIT 2
+    ), comparison_cases AS (
+      SELECT r.*, row_number() OVER (ORDER BY session_date DESC, created_at DESC, id DESC) AS window_index
+      FROM recent r
+    ), progress_cases AS MATERIALIZED (
+      SELECT c.* FROM cases c
+      WHERE EXISTS (SELECT 1 FROM section_scores sc WHERE sc.session_id=c.id)
+      ORDER BY c.session_date DESC, c.created_at DESC, c.id DESC
+      LIMIT CASE WHEN $2::text = 'all' THEN NULL ELSE 10 END
+    ), progress_weeks AS (
+      -- Calendar DATE -> timestamp WITHOUT time zone: no UTC/local conversion.
+      SELECT generate_series(
+        date_trunc('week', min(session_date)::timestamp),
+        date_trunc('week', max(session_date)::timestamp), interval '1 week')::date AS week_start
+      FROM progress_cases
+    ), progress_sections AS (
+      SELECT s.id, s.name, s.display_order, s.average_score AS all_time_avg,
+        s.scored_count AS times_scored,
+        round(avg(sc.score) FILTER (WHERE c.window_index <= 5), 1) AS recent_avg,
+        round(avg(sc.score) FILTER (WHERE c.window_index > 5), 1) AS earlier_avg,
+        count(sc.score) FILTER (WHERE c.window_index <= 5)::int AS recent_count,
+        count(sc.score) FILTER (WHERE c.window_index > 5)::int AS earlier_count
+      FROM section_stats s
+      LEFT JOIN (section_scores sc JOIN comparison_cases c ON c.id=sc.session_id)
+        ON sc.section_id=s.id
+      GROUP BY s.id, s.name, s.display_order, s.average_score, s.scored_count
     )
     SELECT
+      jsonb_build_object(
+        'cases', (SELECT coalesce(jsonb_agg(jsonb_build_object(
+          'id', c.id, 'session_date', c.session_date::text, 'prompt', c.prompt,
+          'is_recent', EXISTS (SELECT 1 FROM focus_cases f WHERE f.id=c.id),
+          'sections', (SELECT jsonb_agg(jsonb_build_object('section_id', s.id, 'score', sc.score)
+            ORDER BY s.display_order, s.id) FROM case_sections s
+            LEFT JOIN section_scores sc ON sc.section_id=s.id AND sc.session_id=c.id)
+          ) ORDER BY c.session_date, c.created_at, c.id), '[]'::jsonb) FROM progress_cases c),
+        'weeks', (SELECT coalesce(jsonb_agg(jsonb_build_object(
+          'week_start', w.week_start::text,
+          'case_count', (SELECT count(*)::int FROM progress_cases c
+            WHERE c.session_date >= w.week_start AND c.session_date < w.week_start + 7),
+          'sections', (SELECT jsonb_agg(jsonb_build_object('section_id', s.id, 'score',
+            (SELECT round(avg(sc.score), 1) FROM section_scores sc JOIN progress_cases c ON c.id=sc.session_id
+              WHERE sc.section_id=s.id AND c.session_date >= w.week_start AND c.session_date < w.week_start + 7))
+            ORDER BY s.display_order, s.id) FROM case_sections s)
+          ) ORDER BY w.week_start), '[]'::jsonb) FROM progress_weeks w),
+        'sections', (SELECT coalesce(jsonb_agg(jsonb_build_object(
+          'id', s.id, 'name', s.name, 'recent_avg', s.recent_avg, 'earlier_avg', s.earlier_avg,
+          'change', round(s.recent_avg - s.earlier_avg, 1),
+          'recent_count', s.recent_count, 'earlier_count', s.earlier_count,
+          'all_time_avg', s.all_time_avg, 'times_scored', s.times_scored
+          ) ORDER BY s.display_order, s.id), '[]'::jsonb) FROM progress_sections s)
+      ) AS section_progress,
       (SELECT coalesce(jsonb_agg(jsonb_build_object(
           'section_id', f.id, 'section_name', f.name, 'average_score', f.average_score,
           'scored_count', f.scored_count, 'case_count', (SELECT count(*)::int FROM focus_cases),
@@ -73,6 +122,6 @@ export async function getDashboard(userId, database = pool) {
               ON sc.section_id = s.id AND sc.session_id = r.id)
         ) ORDER BY r.session_date, r.created_at, r.id), '[]'::jsonb)
         FROM recent r) AS heatmap
-  `, [userId]);
+  `, [userId, range]);
   return rows[0];
 }

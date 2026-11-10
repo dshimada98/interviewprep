@@ -141,7 +141,7 @@ app.use('/api', requireAuth);
 app.use('/api/stories', stories);
 app.use('/api/case-books', caseBooks);
 app.get('/api/dashboard', async (req, res) => {
-  res.json(await getDashboard(req.user.id));
+  res.json(await getDashboard(req.user.id, undefined, req.query.range === 'all' ? 'all' : 'last10'));
 });
 app.get('/api/case-sections', async (_req, res) => {
   res.json(await getCaseSections());

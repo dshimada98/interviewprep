@@ -5,6 +5,7 @@ import { app, sessionStore } from '../artifacts/interviewprep/server/app.mjs';
 import { pool } from '../artifacts/interviewprep/server/db.mjs';
 import { seedQuestionTypes } from '../artifacts/interviewprep/server/question-types.mjs';
 import { seedCaseSections } from '../artifacts/interviewprep/server/case-sections.mjs';
+import { calDate, parseSP, scoreColors, sortByChange, subtitle, trailing3 } from '../artifacts/interviewprep/src/components/section-progress-utils';
 
 const userIds: number[] = [];
 const tokens: string[] = [];
@@ -79,8 +80,100 @@ afterAll(async () => {
 });
 
 describe('private dashboard', () => {
+  it('compares recent five and earlier five section scores with decimal changes and ignores N/A', async () => {
+    const actor = await signUp();
+    const framework = sections.find(s => s.name === 'Framework')!.id;
+    const scores = [1, 2, 2, 2, 2, 2, 2, 2, 3, 2];
+    const ids = [];
+    for (const [index, score] of scores.entries()) {
+      ids.push(await create(actor, 3, `2026-10-${String(index + 1).padStart(2, '0')}`, profit, [
+        { section_id: framework, score },
+        ...(index === 0 ? [{ section_id: math, score: 5 }] : index === 5 ? [{ section_id: math, score: 1 }] : []),
+      ]));
+    }
+    const data = (await actor.agent.get('/api/dashboard').expect(200)).body;
+    const progress = data.section_progress;
+    expect(progress.cases.map((c: { id: number }) => c.id)).toEqual(ids);
+    expect(progress.cases.map((c: { is_recent: boolean }) => c.is_recent))
+      .toEqual([false, false, false, false, false, true, true, true, true, true]);
+    expect(progress.sections.map((s: { id: number }) => s.id)).toEqual(sections.map(s => s.id));
+    expect(progress.sections.find((s: { id: number }) => s.id === framework)).toMatchObject({
+      earlier_avg: 1.8, recent_avg: 2.2, change: 0.4, earlier_count: 5, recent_count: 5,
+      all_time_avg: 2, times_scored: 10,
+    });
+    expect(progress.sections.find((s: { id: number }) => s.id === math)).toMatchObject({
+      earlier_avg: 5, recent_avg: 1, change: -4, earlier_count: 1, recent_count: 1,
+      all_time_avg: 3, times_scored: 2,
+    });
+    expect(progress.cases[1].sections.find((s: { section_id: number }) => s.section_id === math).score).toBeNull();
+    expect(sortByChange(progress.sections).slice(0, 2).map(s => s.id)).toEqual([framework, math]);
+    const all = (await actor.agent.get('/api/dashboard').query({ range: 'all' }).expect(200)).body;
+    expect(all.section_progress.sections).toEqual(progress.sections);
+  });
+
+  it('groups plain calendar dates into Monday weeks, preserving Sunday and empty week gaps', async () => {
+    const actor = await signUp();
+    const framework = sections.find(s => s.name === 'Framework')!.id;
+    for (const [date, score] of [['2026-10-12', 2], ['2026-10-18', 4], ['2026-10-19', 5], ['2026-11-02', 1]] as const) {
+      await create(actor, 3, date, profit, [
+        { section_id: framework, score },
+        ...(date === '2026-10-12' ? [{ section_id: math, score: 4 }] : []),
+      ]);
+    }
+    const { section_progress: progress } = (await actor.agent.get('/api/dashboard').expect(200)).body;
+    expect(progress.weeks.map((w: { week_start: string; case_count: number }) => [w.week_start, w.case_count]))
+      .toEqual([['2026-10-12', 2], ['2026-10-19', 1], ['2026-10-26', 0], ['2026-11-02', 1]]);
+    expect(progress.weeks[0].sections.find((s: { section_id: number }) => s.section_id === framework).score).toBe(3);
+    expect(progress.weeks[0].sections.find((s: { section_id: number }) => s.section_id === math).score).toBe(4);
+    expect(progress.weeks[1].sections.find((s: { section_id: number }) => s.section_id === framework).score).toBe(5);
+    expect(progress.weeks[2].sections.every((s: { score: number | null }) => s.score === null)).toBe(true);
+    expect(progress.sections.every((s: { change: number | null }) => s.change === null)).toBe(true);
+  });
+
+  it('limits only the chart range and uses the same case windows as Next-case focus, including unscored cases', async () => {
+    const actor = await signUp();
+    const framework = sections.find(s => s.name === 'Framework')!.id;
+    const ids = [];
+    for (let index = 1; index <= 12; index++) {
+      ids.push(await create(actor, 3, `2026-10-${String(index).padStart(2, '0')}`, profit, [
+        { section_id: framework, score: index <= 7 ? 2 : 4 },
+      ]));
+    }
+    // Unscored cases affect the five-CASE comparison, but not chart points.
+    await create(actor, 5, '2026-10-13');
+    await create(actor, 1, '2026-10-14', behavioral);
+    const data = (await actor.agent.get('/api/dashboard').expect(200)).body;
+    const all = (await actor.agent.get('/api/dashboard').query({ range: 'all' }).expect(200)).body;
+    expect(data.section_progress.cases.map((c: { id: number }) => c.id)).toEqual(ids.slice(-10));
+    expect(all.section_progress.cases.map((c: { id: number }) => c.id)).toEqual(ids);
+    expect(data.section_progress.sections).toEqual(all.section_progress.sections);
+    const row = data.section_progress.sections.find((s: { id: number }) => s.id === framework);
+    const focus = data.next_case_focus.find((s: { section_id: number }) => s.section_id === framework);
+    expect(row.recent_avg).toBe(focus.average_score);
+    expect(row.recent_count).toBe(focus.scored_count);
+    expect(row).toMatchObject({ recent_count: 4, recent_avg: 4, earlier_count: 5, earlier_avg: 2.4, change: 1.6, times_scored: 12 });
+    expect(data.section_progress.cases.filter((c: { is_recent: boolean }) => c.is_recent)).toHaveLength(4);
+    expect((await actor.agent.get('/api/dashboard').query({ range: 'invalid' }).expect(200)).body.section_progress)
+      .toEqual(data.section_progress);
+  });
+
   it('requires login', async () => {
     await request(app).get('/api/dashboard').expect(401);
+  });
+
+  it('keeps progress chart transforms, calendar labels, URL defaults and colors deterministic', () => {
+    expect(trailing3([1, null, 5, null, null, null, 2])).toEqual([1, 1, 3, 5, 5, null, 2]);
+    expect(calDate('2026-10-18')).toEqual({ short: 'Oct 18', long: 'Oct 18, 2026' });
+    expect(parseSP('?view=heatmap&group=week&range=all')).toEqual({ view: 'heatmap', group: 'week', range: 'all' });
+    expect(parseSP('?view=invalid&group=invalid&range=invalid')).toEqual({ view: 'trends', group: 'case', range: 'last10' });
+    expect(subtitle({ view: 'trends', group: 'case', range: 'last10' }))
+      .toBe('Last 10 cases · shaded = recent 5 · line = 3-case rolling average');
+    expect(subtitle({ view: 'heatmap', group: 'week', range: 'all' }))
+      .toBe('Weekly averages · cases per week under each date');
+    expect(subtitle({ view: 'averages', group: 'week', range: 'last10' }))
+      .toBe('All cases · marker = recent 5 average');
+    expect(scoreColors(2.5)).toEqual(['#FAC775', '#633806']);
+    expect(scoreColors(null)).toEqual(['#E8EAEE', '#5B6577']);
   });
 
   it('returns safe null averages and all zero-count references for a brand-new account', async () => {
@@ -95,6 +188,11 @@ describe('private dashboard', () => {
       ...s, average_score: null, scored_count: 0,
     })));
     expect(data.heatmap).toEqual([]);
+    expect(data.section_progress.cases).toEqual([]);
+    expect(data.section_progress.weeks).toEqual([]);
+    expect(data.section_progress.sections).toHaveLength(7);
+    expect(data.section_progress.sections.every((s: { recent_avg: number | null; change: number | null; times_scored: number }) =>
+      s.recent_avg === null && s.change === null && s.times_scored === 0)).toBe(true);
   });
 
   it('shows an average case score of 4.0 for three Profitability cases scored 3, 4 and 5', async () => {

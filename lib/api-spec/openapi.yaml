@@ -177,6 +177,13 @@ paths:
       operationId: getDashboard
       summary: Private practice dashboard computed from owned sessions
       security: [{sessionCookie: []}]
+      parameters:
+        - name: range
+          in: query
+          schema:
+            type: string
+            enum: [last10, all]
+            default: last10
       responses:
         "200":
           description: Owned practice statistics, section averages, and recent-case heatmap
@@ -516,8 +523,10 @@ components:
           type: integer
     DashboardSummary:
       type: object
-      required: [total_cases, average_case_score, weakest_case_type, behavioral_sessions, cases_by_type, by_case_book, section_averages, heatmap, next_case_focus]
+      required: [total_cases, average_case_score, weakest_case_type, behavioral_sessions, cases_by_type, by_case_book, section_averages, heatmap, next_case_focus, section_progress]
       properties:
+        section_progress:
+          $ref: "#/components/schemas/SectionProgress"
         by_case_book:
           type: array
           items:
@@ -547,6 +556,65 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/DashboardHeatmapSession"
+    SectionProgress:
+      type: object
+      required: [cases, weeks, sections]
+      properties:
+        cases:
+          type: array
+          items:
+            $ref: "#/components/schemas/SectionProgressCase"
+        weeks:
+          type: array
+          items:
+            $ref: "#/components/schemas/SectionProgressWeek"
+        sections:
+          type: array
+          items:
+            $ref: "#/components/schemas/SectionProgressSection"
+    SectionProgressScore:
+      type: object
+      required: [section_id, score]
+      properties:
+        section_id: {type: integer}
+        score: {type: [number, "null"]}
+    SectionProgressCase:
+      type: object
+      required: [id, session_date, prompt, is_recent, sections]
+      properties:
+        id: {type: integer}
+        session_date: {type: string, format: date}
+        prompt: {type: string}
+        is_recent:
+          type: boolean
+          description: Belongs to the same five-case window used by Next-case focus, including unscored cases in the window.
+        sections:
+          type: array
+          items:
+            $ref: "#/components/schemas/SectionProgressScore"
+    SectionProgressWeek:
+      type: object
+      required: [week_start, case_count, sections]
+      properties:
+        week_start: {type: string, format: date}
+        case_count: {type: integer}
+        sections:
+          type: array
+          items:
+            $ref: "#/components/schemas/SectionProgressScore"
+    SectionProgressSection:
+      type: object
+      required: [id, name, recent_avg, earlier_avg, change, recent_count, earlier_count, all_time_avg, times_scored]
+      properties:
+        id: {type: integer}
+        name: {type: string}
+        recent_avg: {type: [number, "null"]}
+        earlier_avg: {type: [number, "null"]}
+        change: {type: [number, "null"]}
+        recent_count: {type: integer}
+        earlier_count: {type: integer}
+        all_time_avg: {type: [number, "null"]}
+        times_scored: {type: integer}
     NextCaseFocusSection:
       type: object
       required: [section_id, section_name, average_score, scored_count, case_count, note]

@@ -341,11 +341,48 @@ export const DeleteStoryResponse = zod.void()
 /**
  * @summary Private practice dashboard computed from owned sessions
  */
+export const getDashboardQueryRangeDefault = `last10`;
+
+export const GetDashboardQueryParams = zod.object({
+  "range": zod.enum(['last10', 'all']).default(getDashboardQueryRangeDefault)
+})
+
 export const getDashboardResponseNextCaseFocusMax = 2;
 
 
 
 export const GetDashboardResponse = zod.object({
+  "section_progress": zod.object({
+  "cases": zod.array(zod.object({
+  "id": zod.number().int(),
+  "session_date": zod.coerce.date(),
+  "prompt": zod.string(),
+  "is_recent": zod.boolean().describe('Belongs to the same five-case window used by Next-case focus, including unscored cases in the window.'),
+  "sections": zod.array(zod.object({
+  "section_id": zod.number().int(),
+  "score": zod.number().nullable()
+}))
+})),
+  "weeks": zod.array(zod.object({
+  "week_start": zod.coerce.date(),
+  "case_count": zod.number().int(),
+  "sections": zod.array(zod.object({
+  "section_id": zod.number().int(),
+  "score": zod.number().nullable()
+}))
+})),
+  "sections": zod.array(zod.object({
+  "id": zod.number().int(),
+  "name": zod.string(),
+  "recent_avg": zod.number().nullable(),
+  "earlier_avg": zod.number().nullable(),
+  "change": zod.number().nullable(),
+  "recent_count": zod.number().int(),
+  "earlier_count": zod.number().int(),
+  "all_time_avg": zod.number().nullable(),
+  "times_scored": zod.number().int()
+}))
+}),
   "by_case_book": zod.array(zod.object({
   "publication_year": zod.number().int().nullable(),
   "case_book_id": zod.number().int().nullable(),
