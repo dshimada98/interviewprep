@@ -11,8 +11,10 @@ import type { DashboardHeatmapSession } from './dashboardHeatmapSession';
 import type { DashboardSectionAverage } from './dashboardSectionAverage';
 import type { DashboardWeakestType } from './dashboardWeakestType';
 import type { NextCaseFocusSection } from './nextCaseFocusSection';
+import type { SectionProgress } from './sectionProgress';
 
 export interface DashboardSummary {
+  section_progress: SectionProgress;
   by_case_book: DashboardCaseBook[];
   /** @maxItems 2 */
   next_case_focus: NextCaseFocusSection[];

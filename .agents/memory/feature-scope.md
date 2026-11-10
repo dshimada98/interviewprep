@@ -72,3 +72,14 @@ the primary action.
 
 **How to apply:** Preserve session-logging discoverability when changing navigation
 or page actions; do not treat export as the main practice workflow.
+
+Section progress chart points include only cases with section scores, but its
+recent-versus-earlier comparison uses the latest five case sessions and preceding
+five case sessions, including unscored cases, regardless of the visible range.
+
+**Why:** The user requires comparison windows to match Next-case focus; filtering
+those windows to scored cases would give two different meanings to "recent five."
+
+**How to apply:** Keep chart selection separate from comparison windows. Group
+weeks from plain session calendar dates with Monday starts, not timezone-converted
+instants.

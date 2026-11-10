@@ -64,6 +64,49 @@ export type StoryDetail = StorySummary & {
   sessions: StoryUsage[];
 };
 
+export interface SectionProgressScore {
+  section_id: number;
+  /** @nullable */
+  score: number | null;
+}
+
+export interface SectionProgressCase {
+  id: number;
+  session_date: string;
+  prompt: string;
+  /** Belongs to the same five-case window used by Next-case focus, including unscored cases in the window. */
+  is_recent: boolean;
+  sections: SectionProgressScore[];
+}
+
+export interface SectionProgressWeek {
+  week_start: string;
+  case_count: number;
+  sections: SectionProgressScore[];
+}
+
+export interface SectionProgressSection {
+  id: number;
+  name: string;
+  /** @nullable */
+  recent_avg: number | null;
+  /** @nullable */
+  earlier_avg: number | null;
+  /** @nullable */
+  change: number | null;
+  recent_count: number;
+  earlier_count: number;
+  /** @nullable */
+  all_time_avg: number | null;
+  times_scored: number;
+}
+
+export interface SectionProgress {
+  cases: SectionProgressCase[];
+  weeks: SectionProgressWeek[];
+  sections: SectionProgressSection[];
+}
+
 export interface DashboardCaseBook {
   /** @nullable */
   publication_year: number | null;
@@ -134,6 +177,7 @@ export interface DashboardHeatmapSession {
 }
 
 export interface DashboardSummary {
+  section_progress: SectionProgress;
   by_case_book: DashboardCaseBook[];
   /** @maxItems 2 */
   next_case_focus: NextCaseFocusSection[];
@@ -408,6 +452,18 @@ export type InvalidSessionResponse = SessionValidationError;
 export type ListStoriesParams = {
 competency?: number;
 };
+
+export type GetDashboardParams = {
+range?: GetDashboardRange;
+};
+
+export type GetDashboardRange = typeof GetDashboardRange[keyof typeof GetDashboardRange];
+
+
+export const GetDashboardRange = {
+  last10: 'last10',
+  all: 'all',
+} as const;
 
 export type ListSessionsParams = {
 q?: string;

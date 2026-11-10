@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'wouter';
 import { AlertCircle, Plus } from 'lucide-react';
-import { Bar, BarChart, CartesianGrid, Cell, LabelList, ResponsiveContainer, XAxis, YAxis } from 'recharts';
 import { useGetDashboard, type DashboardSummary } from '@workspace/api-client-react';
 import { useAuth, sessionRequestOptions } from '@/auth';
 import { AppHeader } from './ip';
@@ -11,19 +10,14 @@ import { ChecklistCard } from './checklist';
 import { ByCaseBook } from './case-book-panel';
 import { ExportButton } from './export-button';
 import { dashboardKey, statusOf } from './session-keys';
+import { SectionProgressCard } from './section-progress';
+import { useSectionProgressUrl } from './section-progress-utils';
 
 /** Band thresholds match the scorecard scale: below 3 red (1-2), 3 to below 4 amber (3), 4+ green (4-5). */
 function bandColor(v: number) {
   return v < 3 ? 'var(--score-1)' : v < 4 ? 'var(--score-3)' : 'var(--score-5)';
 }
 const fmt = (v: number) => v.toFixed(1);
-const NA_BG = '#E6E9EE';
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-function shortDate(d: string) {
-  const [y, m, day] = d.split('-').map(Number);
-  return { short: `${MONTHS[m - 1]} ${day}`, long: `${MONTHS[m - 1]} ${day}, ${y}` };
-}
-
 function Panel({ title, children, id, className = '' }: { title: string; children: React.ReactNode; id: string; className?: string }) {
   return (
     <section aria-labelledby={id} className={`min-w-0 rounded-xl p-5 sm:p-6 ${className}`} style={{ background: 'var(--panel)' }}>
@@ -79,107 +73,6 @@ function CasesByType({ d }: { d: DashboardSummary }) {
   );
 }
 
-function SectionChart({ d }: { d: DashboardSummary }) {
-  const rows = [...d.section_averages].sort((a, b) => a.display_order - b.display_order);
-  const data = rows.map(r => ({ name: r.name, value: r.average_score ?? 0, avg: r.average_score }));
-  const unscored = rows.filter(r => r.average_score === null);
-  return (
-    <Panel title="Average score by section" id="h-chart">
-      {rows.every(r => r.average_score === null) ? (
-        <p className="text-sm text-muted-foreground" data-testid="text-chart-empty">No section scores yet. Score sections on a case session to fill this chart.</p>
-      ) : (
-        <div aria-hidden className="h-[300px] -ml-2">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} layout="vertical" margin={{ top: 4, right: 36, bottom: 4, left: 4 }}>
-              <CartesianGrid horizontal={false} stroke="#D5DAE1" />
-              <XAxis type="number" domain={[0, 5]} ticks={[0, 1, 2, 3, 4, 5]} tick={{ fontSize: 12, fill: '#5B6577' }} />
-              <YAxis type="category" dataKey="name" width={118} tick={{ fontSize: 12, fill: '#1F2A44' }} interval={0} />
-              <Bar dataKey="value" radius={[0, 4, 4, 0]} isAnimationActive={false} barSize={18}>
-                {data.map(r => <Cell key={r.name} fill={r.avg === null ? 'transparent' : bandColor(r.avg)} />)}
-                <LabelList dataKey="avg" position="right" formatter={(v: unknown) => (typeof v === 'number' ? fmt(v) : '')}
-                  style={{ fontSize: 12, fontWeight: 700, fill: '#1F2A44' }} />
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      )}
-      <ul className="sr-only" data-testid="list-section-averages">
-        {rows.map(r => <li key={r.id}>{r.name}: {r.average_score === null ? 'not scored yet' : `average ${fmt(r.average_score)} out of 5, scored ${r.scored_count} ${r.scored_count === 1 ? 'time' : 'times'}`}</li>)}
-      </ul>
-      {unscored.length > 0 && (
-        <p className="mt-2 text-xs text-muted-foreground" data-testid="text-unscored-sections">
-          {unscored.map(r => r.name).join(', ')}: not scored yet
-        </p>
-      )}
-    </Panel>
-  );
-}
-
-function Legend() {
-  const items = [['1-2', 'var(--score-1)'], ['3', 'var(--score-3)'], ['4-5', 'var(--score-5)'], ['N/A', NA_BG]];
-  return (
-    <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs font-medium" aria-label="Score color legend">
-      {items.map(([l, c]) => <li key={l} className="inline-flex items-center gap-1.5"><span aria-hidden className="h-3 w-3 rounded-sm" style={{ background: c }} />{l}</li>)}
-    </ul>
-  );
-}
-
-function Heatmap({ d }: { d: DashboardSummary }) {
-  const rows = [...d.section_averages].sort((a, b) => a.display_order - b.display_order);
-  const cols = d.heatmap;
-  return (
-    <Panel title="Section heatmap" id="h-heatmap">
-      {cols.length === 0 ? (
-        <p className="text-sm text-muted-foreground" data-testid="text-heatmap-empty">Log a case session to start the heatmap.</p>
-      ) : (
-        <>
-          <div className="w-full min-w-0 max-w-full overflow-x-auto rounded-lg bg-white"
-            style={{ contain: 'inline-size layout paint' }} data-testid="scroll-heatmap">
-            <table className="border-separate border-spacing-1 text-sm">
-              <caption className="sr-only">Section scores for your {cols.length} most recent case sessions, oldest first. Blank cells are N/A.</caption>
-              <thead>
-                <tr>
-                  <th scope="col" className="sticky left-0 z-10 bg-white text-left px-2 font-semibold text-xs text-muted-foreground">Section</th>
-                  {cols.map(c => {
-                    const dt = shortDate(c.session_date);
-                    return (
-                      <th key={c.id} scope="col" className="px-0 font-semibold">
-                        <Link href={`/sessions/${c.id}`} title={`${dt.long}: ${c.prompt}`} aria-label={`${dt.long}: ${c.prompt}`}
-                          data-testid={`link-heatmap-session-${c.id}`}
-                          className="ip-focus inline-flex min-h-11 min-w-11 items-center justify-center rounded px-1 text-xs whitespace-nowrap underline underline-offset-2 decoration-[color:var(--green)] hover:bg-[color:var(--panel)]">
-                          {dt.short}
-                        </Link>
-                      </th>
-                    );
-                  })}
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map(r => (
-                  <tr key={r.id}>
-                    <th scope="row" className="sticky left-0 z-10 bg-white text-left font-medium px-2 whitespace-nowrap max-w-[9rem] truncate" title={r.name}>{r.name}</th>
-                    {cols.map(c => {
-                      const s = c.sections.find(x => x.section_id === r.id)?.score ?? null;
-                      return (
-                        <td key={c.id} data-testid={`cell-heatmap-${c.id}-${r.id}`}
-                          className="h-11 min-w-11 w-11 rounded text-center font-bold tabular-nums text-white"
-                          style={{ background: s === null ? NA_BG : bandColor(s) }}>
-                          {s === null ? <span className="sr-only">N/A</span> : s}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <Legend />
-        </>
-      )}
-    </Panel>
-  );
-}
-
 function Skeleton() {
   return (
     <div aria-busy="true" aria-live="polite" className="space-y-5">
@@ -193,8 +86,10 @@ function Skeleton() {
 
 export function DashboardPage() {
   const { user, refresh } = useAuth();
-  const q = useGetDashboard({
-    query: { queryKey: dashboardKey(user?.id), enabled: !!user, staleTime: 30_000, refetchOnMount: 'always', retry: false },
+  const sp = useSectionProgressUrl();
+  const range = sp.state.range;
+  const q = useGetDashboard({ range }, {
+    query: { queryKey: dashboardKey(user?.id, range), placeholderData: (prev, previousQuery) => previousQuery?.queryKey[1] === user?.id ? prev : undefined, enabled: !!user, staleTime: 30_000, refetchOnMount: 'always', retry: false },
     request: sessionRequestOptions(),
   });
   const [retrying, setRetrying] = useState(false);
@@ -206,7 +101,7 @@ export function DashboardPage() {
   return (
     <div className="min-h-[100dvh]">
       <AppHeader />
-      <main className="max-w-6xl mx-auto px-5 sm:px-8 py-8 sm:py-12 overflow-x-clip" style={{ color: 'var(--navy)' }}>
+      <main className="max-w-6xl mx-auto px-5 sm:px-8 py-8 sm:py-12" style={{ color: 'var(--navy)' }}>
         <p className="ip-rise text-xs font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--green-text)' }}>Overview</p>
         <div className="mt-2 mb-6 sm:mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="ip-rise text-3xl sm:text-4xl font-bold tracking-tight">Dashboard</h1>
@@ -247,13 +142,10 @@ export function DashboardPage() {
             <Stats d={d} />
             <CasesByType d={d} />
             <ByCaseBook d={d} scoreColor={bandColor} />
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-              <SectionChart d={d} />
-              <Heatmap d={d} />
-            </div>
           </div>
         ) : null}
 
+        {d && <div className="mt-5"><SectionProgressCard d={d.section_progress} st={sp.state} set={sp.set} loading={q.isPlaceholderData} /></div>}
         <PracticeAreas />
       </main>
     </div>

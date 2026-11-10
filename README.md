@@ -14,7 +14,7 @@ Live URL: myinterviewprep.replit.app
 - **Case books:** Organize cases by book and publication year, add private books, and review practice by book.
 - **Behavioral categories:** Use built-in question types or add private custom categories.
 - **STAR story bank:** Save stories by competency, link them to behavioral practice, and track practice counts and average scores.
-- **Dashboard:** Review practice totals, score trends, question-type breakdowns, section averages, and a section heatmap.
+- **Dashboard:** Review practice totals and question-type breakdowns, plus a Section progress card with case/weekly trends, heatmaps, all-time averages, and recent-versus-earlier section comparisons.
 - **Next-case focus:** Identify the weakest sections from recent cases and see the latest improvement notes.
 - **Improvement checklist:** Add or copy improvement notes, optionally tag a case section, and edit, complete, or clear checklist items.
 - **Stars:** Save important sessions for later review in a dedicated starred view.
