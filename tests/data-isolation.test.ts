@@ -6,6 +6,7 @@ import { app, sessionStore } from '../artifacts/interviewprep/server/app.mjs';
 import { pool } from '../artifacts/interviewprep/server/db.mjs';
 import { seedQuestionTypes } from '../artifacts/interviewprep/server/question-types.mjs';
 import { seedCaseBooks, caseBookSeeds } from '../artifacts/interviewprep/server/case-books.mjs';
+import { groupBookNames, editionYearError } from '../artifacts/interviewprep/src/components/case-book-name';
 
 const userIds: number[] = [];
 const csrfTokens: string[] = [];
@@ -56,6 +57,137 @@ afterAll(async () => {
 });
 
 describe('practice-session data isolation', () => {
+  it('groups edition names once and validates freely typed years without changing edition identities', () => {
+    const books = [
+      { id: 101, name: '  DARDEN   CASEBOOK ', publication_year: 2023, user_id: 9, created_at: '' },
+      { id: 102, name: 'Darden Casebook', publication_year: null, user_id: null, created_at: '' },
+      { id: 103, name: 'Darden Casebook', publication_year: 2024, user_id: 9, created_at: '' },
+      { id: 104, name: 'My book', publication_year: null, user_id: 9, created_at: '' },
+    ];
+    const grouped = groupBookNames(books);
+    expect(grouped.map(b => b.name)).toEqual(['Darden Casebook', 'My book']);
+    expect(grouped[0].rep.id).toBe(102);
+    expect(books[0].id).toBe(101);
+    for (const year of ['', '1990', '2023', String(new Date().getFullYear() + 1)]) {
+      expect(editionYearError(year)).toBeNull();
+    }
+    for (const year of ['1850', 'abcd', '2023.5', '2e3', String(new Date().getFullYear() + 2)]) {
+      expect(editionYearError(year)).toBe(
+        `Please enter a four-digit year between 1990 and ${new Date().getFullYear() + 1}.`);
+    }
+  });
+
+  it('resolves concurrent typed editions once, reuses unknown shared editions, and keeps editions private', async () => {
+    const a = await signUp(), b = await signUp();
+    const types = (await a.agent.get('/api/question-types').expect(200)).body;
+    const shared = (await a.agent.get('/api/case-books').expect(200)).body.books
+      .find((book: { name: string; publication_year: number | null }) =>
+        book.name === 'Darden Casebook' && book.publication_year === null);
+    const base = { question_type_id: types.case[0].id, case_book_id: shared.id,
+      session_date: '2026-01-05', prompt: 'Typed Darden edition', format: 'solo', overall_score: 3 };
+    const post = (u: typeof a, extra: object = {}) => u.agent.post('/api/sessions')
+      .set('X-CSRF-Token', u.csrfToken).send({ ...base, ...extra });
+    const saves = await Promise.all([post(a, { case_book_publication_year: 2023 }),
+      post(a, { case_book_publication_year: 2023 })]);
+    expect(saves.map(r => r.status)).toEqual([201, 201]);
+    const editionId = saves[0].body.case_book_id;
+    expect(saves[1].body.case_book_id).toBe(editionId);
+    expect(editionId).not.toBe(shared.id);
+    expect(saves.every(r => r.body.case_book_publication_year === 2023 && r.body.case_book_name === shared.name)).toBe(true);
+    const own = () => pool.query(`SELECT id FROM case_books WHERE user_id=$1
+      AND category_name_key(name)=category_name_key($2) AND publication_year=2023`, [a.id, shared.name]);
+    expect((await own()).rows).toEqual([{ id: editionId }]);
+    expect((await a.agent.get('/api/case-books').expect(200)).body.most_recent_case_book_id).toBe(editionId);
+    // A private edition ID also supplies only its name, not a hidden year.
+    for (const year of [null, '', undefined]) {
+      const saved = (await post(a, { case_book_id: editionId, case_book_publication_year: year }).expect(201)).body;
+      expect(saved.case_book_id).toBe(shared.id);
+      expect(saved.case_book_publication_year).toBeNull();
+    }
+    expect((await own()).rowCount).toBe(1);
+    const bBooks = (await b.agent.get('/api/case-books').expect(200)).body.books;
+    expect(bBooks.some((book: { id: number }) => book.id === editionId)).toBe(false);
+    const invalid = await post(b, { case_book_id: editionId, case_book_publication_year: 2023 }).expect(400);
+    expect(invalid.body.errors.case_book_id).toBe('Please choose a case book.');
+    const bEdition = (await post(b, { case_book_publication_year: 2023 }).expect(201)).body;
+    expect(bEdition.case_book_id).not.toBe(editionId);
+    const updated = (await a.agent.put(`/api/sessions/${saves[0].body.id}`).set('X-CSRF-Token', a.csrfToken)
+      .send({ ...base, case_book_id: editionId, case_book_publication_year: 2023 }).expect(200)).body;
+    expect(updated.case_book_id).toBe(editionId);
+    expect((await a.agent.get('/api/dashboard').expect(200)).body.by_case_book
+      .find((row: { case_book_id: number }) => row.case_book_id === editionId).publication_year).toBe(2023);
+  });
+
+  it('validates typed years against the current year before creating any edition', async () => {
+    const a = await signUp();
+    const types = (await a.agent.get('/api/question-types').expect(200)).body;
+    const book = (await a.agent.get('/api/case-books').expect(200)).body.books[0];
+    const input = { question_type_id: types.case[0].id, case_book_id: book.id,
+      session_date: '2026-01-05', prompt: 'Edition validation', format: 'solo', overall_score: 3 };
+    for (const year of [1850, 'abcd', '2023', 2024.5, true, {}, new Date().getFullYear() + 2]) {
+      const result = await a.agent.post('/api/sessions').set('X-CSRF-Token', a.csrfToken)
+        .send({ ...input, case_book_publication_year: year }).expect(400);
+      expect(result.body.errors.case_book_publication_year).toBe(
+        `Please enter a four-digit year between 1990 and ${new Date().getFullYear() + 1}.`);
+    }
+    expect((await pool.query('SELECT id FROM case_books WHERE user_id=$1', [a.id])).rowCount).toBe(0);
+    for (const year of [1990, new Date().getFullYear() + 1]) {
+      const result = await a.agent.post('/api/sessions').set('X-CSRF-Token', a.csrfToken)
+        .send({ ...input, case_book_publication_year: year }).expect(201);
+      expect(result.body.case_book_publication_year).toBe(year);
+    }
+  });
+
+  it('saves, clears, validates and privately filters interview styles with accurate dashboard averages', async () => {
+    const a = await signUp(), b = await signUp();
+    const types = (await a.agent.get('/api/question-types').expect(200)).body;
+    const sections = (await a.agent.get('/api/case-sections').expect(200)).body;
+    const base = { question_type_id: types.case[0].id, session_date: '2026-01-05',
+      prompt: 'Style case', format: 'solo', overall_score: 3 };
+    const post = (u: typeof a, extra: object) => u.agent.post('/api/sessions')
+      .set('X-CSRF-Token', u.csrfToken).send({ ...base, ...extra });
+    expect((await a.agent.get('/api/dashboard').expect(200)).body.by_case_style).toEqual([]);
+    const first = (await post(a, { case_style: 'interviewer_led', section_scores: [
+      { section_id: sections[0].id, score: 2 }, { section_id: sections[1].id, score: 1 },
+    ] }).expect(201)).body;
+    await post(a, { case_style: 'interviewer_led', overall_score: 5,
+      section_scores: [{ section_id: sections[0].id, score: 4 }] }).expect(201);
+    await post(a, { case_style: 'candidate_led', overall_score: 2,
+      section_scores: [{ section_id: sections[0].id, score: 1 }] }).expect(201);
+    await post(a, { case_style: 'not_sure', overall_score: 4 }).expect(201);
+    await post(a, { case_style: '', overall_score: 1 }).expect(201);
+    const behavior = (await post(a, { question_type_id: types.behavioral[0].id,
+      case_style: 'candidate_led' }).expect(201)).body;
+    expect(behavior.case_style).toBeNull();
+    const before = (await a.agent.get('/api/dashboard').expect(200)).body.by_case_style;
+    expect(before).toEqual([
+      { case_style: 'interviewer_led', name: 'Interviewer-led', count: 2, average_score: 4, weakest_section: sections[0].name },
+      { case_style: 'candidate_led', name: 'Candidate-led', count: 1, average_score: 2, weakest_section: null },
+      { case_style: 'not_sure', name: 'Not sure', count: 1, average_score: 4, weakest_section: null },
+      { case_style: null, name: 'Not set', count: 1, average_score: 1, weakest_section: null },
+    ]);
+    await post(b, { case_style: 'interviewer_led', overall_score: 1,
+      section_scores: sections.slice(0, 2).map((s: { id: number }) => ({ section_id: s.id, score: 1 })) }).expect(201);
+    expect((await a.agent.get('/api/dashboard').expect(200)).body.by_case_style).toEqual(before);
+    for (const [style, count] of [['interviewer_led', 2], ['candidate_led', 1], ['not_sure', 1], ['not_set', 1]]) {
+      const list = (await a.agent.get('/api/sessions').query({ style, user_id: b.id }).expect(200)).body;
+      expect(list.total).toBe(6);
+      expect(list.sessions).toHaveLength(count as number);
+      expect(list.sessions.every((s: { case_style: string | null; kind: string }) =>
+        s.kind === 'case' && s.case_style === (style === 'not_set' ? null : style))).toBe(true);
+    }
+    for (const style of ['bad', 1, {}, []]) {
+      const result = await post(a, { case_style: style }).expect(400);
+      expect(result.body.errors.case_style).toBe('Please choose an interview style from the list.');
+    }
+    expect((await a.agent.get(`/api/sessions/${first.id}`).expect(200)).body.case_style).toBe('interviewer_led');
+    const switched = (await a.agent.put(`/api/sessions/${first.id}`).set('X-CSRF-Token', a.csrfToken)
+      .send({ ...base, question_type_id: types.behavioral[0].id, case_style: 'interviewer_led' }).expect(200)).body;
+    expect(switched.case_style).toBeNull();
+    expect((await b.agent.get('/api/sessions').query({ style: 'interviewer_led', user_id: a.id }).expect(200))
+      .body.sessions).toHaveLength(1);
+  });
+
   it('exports a complete, formatted, formula-free workbook containing only the signed-in user data', async () => {
     const a = await signUp(), b = await signUp();
     async function download(u: typeof a, query = {}) {
@@ -94,7 +226,7 @@ describe('practice-session data isolation', () => {
     }).expect(201)).body;
     const first = (await a.agent.post('/api/sessions').set('X-CSRF-Token', a.csrfToken).send({
       question_type_id: types.case[0].id, session_date: '2025-10-28', prompt: 'Coffee chain profitability',
-      case_book_id: book.id, format: 'partner', overall_score: 3,
+      case_book_id: book.id, case_book_publication_year: 2025, case_style: 'interviewer_led', format: 'partner', overall_score: 3,
       went_well: '=HYPERLINK("https://example.test","literal text")', to_improve: 'Summarize recommendation',
       section_scores: sections.slice(0, 3).map((s: { id: number }, i: number) =>
         ({ section_id: s.id, score: [2, 3, 5][i], went_well: '=2+2', to_improve: `Section action ${i}` })),
@@ -122,20 +254,22 @@ describe('practice-session data isolation', () => {
     expect(strings).toContain('=1+1');
     expect(strings).toContain('+SUM(A1:A2)');
     const cases = exported.getWorksheet('Cases')!;
-    expect(cases.getRow(1).values).toEqual([undefined, 'Date', 'Case book', 'Case type', 'Prompt', 'Format', 'Overall score',
+    expect(cases.getRow(1).values).toEqual([undefined, 'Date', 'Case book', 'Interview style', 'Case type', 'Prompt', 'Format', 'Overall score',
       'Introduction', 'Framework', 'Exhibits', 'Math', 'Brainstorm', 'Recommendation', 'Driving the case forward',
       'What went well', 'What to improve', 'Starred']);
     expect(cases.rowCount).toBe(3);
-    expect(cases.getCell('D2').value).toBe('+Unfiltered newest case');
+    expect(cases.getCell('E2').value).toBe('+Unfiltered newest case');
+    expect(cases.getCell('C2').value).toBeNull();
+    expect(cases.getCell('C3').value).toBe('Interviewer-led');
     expect(cases.getCell('B2').value).toBe('No book / live case');
     expect(cases.getCell('B3').value).toBe('Export casebook (2025)');
-    expect(cases.getCell('P3').value).toBe('Yes');
-    expect(cases.getCell('J3').value).toBeNull();
+    expect(cases.getCell('Q3').value).toBe('Yes');
+    expect(cases.getCell('K3').value).toBeNull();
     expect(cases.getCell('A3').value).toBeInstanceOf(Date);
     expect((cases.getCell('A3').value as Date).toISOString().slice(0, 10)).toBe('2025-10-28');
     expect(cases.getCell('A3').numFmt).toBe('d-mmm-yyyy');
-    expect(cases.getCell('F3').value).toBe(3);
-    for (const [address, fill] of [['G3', 'FFF5B7B1'], ['H3', 'FFFAD7A0'], ['I3', 'FFABEBC6']]) {
+    expect(cases.getCell('G3').value).toBe(3);
+    for (const [address, fill] of [['H3', 'FFF5B7B1'], ['I3', 'FFFAD7A0'], ['J3', 'FFABEBC6']]) {
       expect(cases.getCell(address).fill).toMatchObject({ type: 'pattern', fgColor: { argb: fill } });
       expect(cases.getCell(address).font.color?.argb).toBe('FF1F2A44');
     }
@@ -167,7 +301,7 @@ describe('practice-session data isolation', () => {
       expect(sheet.views[0]).toMatchObject({ state: 'frozen', ySplit: row });
       expect(sheet.autoFilter).toBeTruthy();
     }
-    expect(cases.getCell('D3').alignment.wrapText).toBe(true);
+    expect(cases.getCell('E3').alignment.wrapText).toBe(true);
     // Spoofed owner/query filters cannot change the export's server-side ownership.
     const other = await download(b, { user_id: a.id });
     expect(allText(other)).not.toContain('Coffee chain profitability');
@@ -338,7 +472,8 @@ describe('practice-session data isolation', () => {
     const types = (await a.agent.get('/api/question-types').expect(200)).body;
     for (const [book, date] of [[old, '2025-01-01'], [recent, '2025-01-02']] as const) {
       const result = await a.agent.post('/api/sessions').set('X-CSRF-Token', a.csrfToken)
-        .send({ question_type_id: types.case[0].id, case_book_id: book.id, session_date: date,
+        .send({ question_type_id: types.case[0].id, case_book_id: book.id,
+          case_book_publication_year: book.publication_year, session_date: date,
           prompt: 'Edition case', format: 'solo', overall_score: 4 }).expect(201);
       expect(result.body.case_book_publication_year).toBe(book.publication_year);
       expect((await a.agent.get(`/api/sessions/${result.body.id}`).expect(200)).body.case_book_publication_year)
@@ -362,7 +497,8 @@ describe('practice-session data isolation', () => {
     for (const year of [999, 10000, 2024.5, '2024', 'bad', '']) {
       const r = await a.agent.post('/api/case-books').set('X-CSRF-Token', a.csrfToken)
         .send({ name: 'Year validation', publication_year: year }).expect(400);
-      expect(r.body.errors.publication_year).toBe('Please enter a four-digit year, like 2025.');
+      expect(r.body.errors.publication_year).toBe(
+        `Please enter a four-digit year between 1990 and ${new Date().getFullYear() + 1}.`);
     }
     const client = await pool.connect();
     try {

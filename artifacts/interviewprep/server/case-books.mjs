@@ -5,8 +5,10 @@ export const caseBookSeeds = [
   'Case in Point', 'Victor Cheng (Case Interview Secrets)', 'Haas Casebook',
   'Wharton Casebook', 'Kellogg Casebook', 'Columbia Casebook', 'Darden Casebook',
   'Tuck Casebook', 'Ross Casebook', 'Fuqua Casebook', 'MIT Sloan Casebook',
-  'Stern Casebook', 'Firm website practice cases',
+  'Stern Casebook', 'Firm website practice cases', 'Booth Casebook',
 ];
+export const publicationYearError = () =>
+  `Please enter a four-digit year between 1990 and ${new Date().getFullYear() + 1}.`;
 
 export async function seedCaseBooks(database = pool) {
   await database.query(`INSERT INTO case_books (name)
@@ -22,6 +24,25 @@ export async function visibleCaseBook(database, id, userId) {
     'SELECT id FROM case_books WHERE id=$1 AND (user_id IS NULL OR user_id=$2) FOR KEY SHARE',
     [id, userId],
   )).rowCount > 0;
+}
+
+// Called inside the session transaction, after all input validation succeeded.
+// The lock key matches the edition-scope trigger, including shared seed inserts.
+export async function resolveCaseBookEdition(database, id, year, userId) {
+  const selected = (await database.query(`SELECT name FROM case_books
+    WHERE id=$1 AND (user_id IS NULL OR user_id=$2) FOR KEY SHARE`, [id, userId])).rows[0];
+  if (!selected) throw new Error('Validated case book is no longer available.');
+  await database.query(`SELECT pg_advisory_xact_lock(hashtextextended(
+    'case-book:' || category_name_key($1::text) || ':' || coalesce($2::integer,0)::text,0))`,
+  [selected.name, year]);
+  const { rows } = await database.query(`SELECT id FROM case_books
+    WHERE category_name_key(name)=category_name_key($1)
+      AND publication_year IS NOT DISTINCT FROM $2::integer
+      AND (user_id IS NULL OR user_id=$3)
+    ORDER BY (user_id IS NOT NULL),id LIMIT 1 FOR KEY SHARE`, [selected.name, year, userId]);
+  if (rows.length) return rows[0].id;
+  return (await database.query(`INSERT INTO case_books(name,publication_year,user_id)
+    VALUES ($1,$2,$3) RETURNING id`, [selected.name, year, userId])).rows[0].id;
 }
 
 export const caseBooks = Router();
@@ -41,8 +62,8 @@ caseBooks.post('/', async (req, res) => {
   if (!name) return invalid('Please enter a case book name.');
   if (name.length > 60) return invalid('Please keep it under 60 characters.');
   const year = req.body?.publication_year ?? null;
-  if (year !== null && (!Number.isInteger(year) || year < 1000 || year > 9999)) {
-    return res.status(400).json({ errors: { publication_year: 'Please enter a four-digit year, like 2025.' } });
+  if (year !== null && (!Number.isInteger(year) || year < 1990 || year > new Date().getFullYear() + 1)) {
+    return res.status(400).json({ errors: { publication_year: publicationYearError() } });
   }
   try {
     const { rows } = await pool.query(

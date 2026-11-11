@@ -29,14 +29,16 @@ custom types belong to one user. Custom categories are behavioral only.
 
 Names are compared ignoring capitalization, leading/trailing whitespace, and
 repeated whitespace. Partial unique indexes enforce shared and per-owner
-uniqueness; a database trigger also rejects shared/private name collisions and
+uniqueness; a database trigger also rejects new private/shared name collisions and
 non-behavioral custom types. Equal names for two different private owners are
 allowed. Custom names must be nonblank and at most 40 characters.
+New shared seeds may coexist with pre-existing private categories without
+changing those categories' IDs, kinds, or historical session links.
 
 Initial reference rows:
 
 - **Case:** Market Sizing, Profitability, Market Entry, M&A, Growth Strategy,
-  Pricing, Operations.
+  Pricing, Operations, Private Equity, Wildcard.
 - **Behavioral:** Leadership, Teamwork, Conflict, Failure / Setback, Impact,
   Why Consulting, Tell me about yourself, Why this firm, Influencing without
   authority, Entrepreneurial drive, Courageous change, Navigating ambiguity,
@@ -58,7 +60,8 @@ case sessions, while a case session has one book or none.
 
 Partial unique indexes and a scope-check trigger enforce case-insensitive,
 whitespace-normalized uniqueness for the **same name and publication year**
-against shared editions and the user's own books. Different years are separate
+within each owner's editions and prevent new private duplicates of shared
+editions. Shared seeds may coexist with pre-existing private editions. Different years are separate
 books with separate IDs, session filters, and dashboard aggregates. Unknown-year
 books are distinct from dated editions; two unknown-year books with the same
 name still conflict within the same visibility scope. Different private owners
@@ -68,25 +71,57 @@ may use the same edition. Server identity—not submitted
 Shared seeds: Case in Point, Victor Cheng (Case Interview Secrets), Haas Casebook,
 Wharton Casebook, Kellogg Casebook, Columbia Casebook, Darden Casebook, Tuck
 Casebook, Ross Casebook, Fuqua Casebook, MIT Sloan Casebook, Stern Casebook,
-Firm website practice cases.
+Firm website practice cases, Booth Casebook. Shared seeds insert only missing
+rows at startup. A newly shared book may coexist with a legacy private edition;
+existing private IDs and session links are never changed. New private duplicates
+of an already-shared edition are still rejected.
 
 `GET /api/case-books` returns `{ books, most_recent_case_book_id }`: shared books
 alphabetically, then the user's private books alphabetically. The most recent
 case is ordered by session date, creation timestamp, then ID descending. Its book
-ID (including NULL for a live case) defaults only the new-session form; editing
-keeps the saved book, and refetching never overwrites a user's draft choice.
+ID (including NULL for a live case) defaults the new-session form's book name
+AND year; editing pre-fills the saved name and year, and refetching never
+overwrites a user's draft choice.
 `POST /api/case-books` accepts `{ name, publication_year? }` and creates a private
 book. The year is optional; omitted/null leaves it unknown. Existing books and
 links keep their IDs and an unknown year; shared seed years are never guessed.
-The form, filters, session cards/details, and dashboard show known years as
-`Name (2025)`. Session responses expose `case_book_publication_year`; dashboard
-book rows expose `publication_year`.
+The session form lists each normalized name once, combines shared and owned
+editions by name, and has a separate optional typed edition year. Inline add
+asks for a name only. When saving a session, `case_book_id` must be shared or
+owned by the logged-in user. The server takes that book's name and the submitted
+`case_book_publication_year` (blank, omitted, or NULL means unknown) and resolves:
+
+1. A shared edition with that normalized name and year.
+2. Otherwise, that user's private edition with that name and year.
+3. Otherwise, a new private edition for that user.
+
+Resolution and session saving share a transaction. A transaction-scoped advisory
+lock using the same normalized name/year key as the scope trigger serializes
+lookup plus insert; the unique edition indexes also remain in place. Two quick
+saves reuse one private edition. Other owners' books are never eligible, even
+when the submitted ID or name/year matches. No editions table was added.
+
+New typed years must be whole numbers from 1990 through next calendar year
+(calculated at validation time). The broader existing database range is retained
+to avoid altering historical rows. Filters, session cards/details, dashboard book
+rows, and Excel still distinguish and label editions as `Name (2025)`.
+Session responses expose `case_book_publication_year`; dashboard book rows expose
+`publication_year`.
 
 ## practice_sessions
 
 Each practice session belongs to exactly one user. Feature 3 uses this existing
 table for the authenticated practice log, creation, detail, editing, and deletion.
 Feature 10 adds an optional story link without replacing existing session data.
+
+Interview style is case-only: empty/omitted values are stored as NULL, and saving
+a session as behavioral clears the style. `GET /api/sessions?style=` accepts
+`interviewer_led`, `candidate_led`, `not_sure`, or `not_set` (case sessions with
+NULL style), always within the logged-in user's data. Dashboard `by_case_style`
+uses owned case sessions, rounds overall averages to one decimal, and includes
+a weakest section only when it has been scored at least twice within that style.
+Apply the updated idempotent `schema.sql` before running this version against an
+existing database; seeding does not perform schema migrations.
 
 | Column | PostgreSQL type | Rules |
 | --- | --- | --- |
@@ -95,6 +130,7 @@ Feature 10 adds an optional story link without replacing existing session data.
 | question_type_id | integer | Required foreign key to `question_types.id` |
 | story_id | integer, nullable | Foreign key to `stories.id`, `ON DELETE SET NULL`; only an owned story on a behavioral session |
 | case_book_id | integer, nullable | Foreign key to case_books.id, ON DELETE SET NULL; shared or owned book on a case session only |
+| case_style | text, nullable | Optional `interviewer_led`, `candidate_led`, or `not_sure`; database CHECK rejects other non-NULL values |
 | session_date | date | Required calendar date, no time of day |
 | prompt | text | Required |
 | format | text | Required, defaults to `solo`; database check allows `solo`, `partner`, or `mock` |

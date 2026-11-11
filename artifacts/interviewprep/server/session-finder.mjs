@@ -18,6 +18,11 @@ export function sessionListQuery(userId, query, fields) {
         AND (ss.went_well ILIKE ${pattern} OR ss.to_improve ILIKE ${pattern})))`);
   }
   const kind = scalar(query.kind);
+  const style = scalar(query.style);
+  if (style === 'not_set') filters.push("s.kind='case' AND s.case_style IS NULL");
+  else if (['interviewer_led', 'candidate_led', 'not_sure'].includes(style)) {
+    filters.push(`s.kind='case' AND s.case_style=${param(style)}`);
+  }
   const book = scalar(query.book);
   if (book === 'none') filters.push("s.kind='case' AND s.case_book_id IS NULL");
   else if (/^[1-9]\d*$/.test(book) && Number(book) <= 2147483647) {

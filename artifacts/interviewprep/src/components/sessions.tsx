@@ -18,6 +18,8 @@ import { StorySelect } from './story-select';
 import { CategorySelect } from './category-select';
 import { CaseBookSelect, NO_BOOK, useCaseBooks } from './case-book-select';
 import { caseBookLabel } from './case-book-label';
+import { editionYearError, normBookName } from './case-book-name';
+import { StyleChip, StylePicker, isStyle } from './interview-style';
 import { ExportButton } from './export-button';
 import { ClearFilters, FinderControls, useSessionFinder } from './session-finder';
 import { STAR_ERROR, StarButton, useStarToggle, type StarToggle } from './session-stars';
@@ -129,6 +131,7 @@ function SessionCards({ data, star }: { data: PracticeSession[]; star: StarToggl
               <span className="inline-flex items-center gap-1.5 font-semibold"><CalendarDays className="h-4 w-4" aria-hidden />{fmtDate(s.session_date)}</span>
               <KindTag kind={s.kind} />
               <span className="text-muted-foreground">{s.question_type_name}</span>
+              {s.kind === 'case' && <StyleChip style={s.case_style} testid={`chip-case-style-${s.id}`} />}
               <span className="ml-auto inline-flex items-center gap-2"><ScoreBar score={s.overall_score} /><span className="rounded-full px-2.5 py-1 font-semibold tabular-nums text-white" style={{ background: `var(--score-${s.overall_score})` }}>{s.overall_score}/5</span></span>
             </div>
             <p className="mt-2.5 font-medium line-clamp-2 break-words group-hover:underline underline-offset-4">{s.prompt}</p>
@@ -323,6 +326,7 @@ export function SessionDetailPage({ rawId }: { rawId?: string }) {
               <div className="flex flex-wrap items-center gap-3 text-sm">
                 <KindTag kind={s.kind} />
                 <span className="font-semibold">{s.question_type_name}</span>
+                {s.kind === 'case' && <StyleChip style={s.case_style} testid="chip-case-style" />}
               </div>
               {s.kind === 'case' && <p className="mt-2 text-sm text-muted-foreground break-words" data-testid="text-case-book">{caseBookLabel(s.case_book_name ?? NO_BOOK, s.case_book_publication_year)}</p>}
               <h1 className="mt-3 text-2xl sm:text-3xl font-bold tracking-tight break-words whitespace-pre-wrap" data-testid="text-prompt">{s.prompt}</h1>
@@ -402,9 +406,9 @@ export function SessionDetailPage({ rawId }: { rawId?: string }) {
 
 /* ---------------- Form ---------------- */
 
-type FormVals = { scores?: ScoreDrafts; session_date: string; question_type_id: string; prompt: string; format: string; overall_score: string; duration_minutes: string; went_well: string; to_improve: string; story_id: string; case_book_id: string };
-type Errs = Partial<Record<Exclude<keyof FormVals, 'scores'> | 'section_scores' | 'form', string>>;
-const EMPTY: FormVals = { session_date: '', question_type_id: '', prompt: '', format: '', overall_score: '', duration_minutes: '', went_well: '', to_improve: '', story_id: '', case_book_id: '' };
+type FormVals = { scores?: ScoreDrafts; session_date: string; question_type_id: string; prompt: string; format: string; overall_score: string; duration_minutes: string; went_well: string; to_improve: string; story_id: string; case_book_id: string; case_book_publication_year: string; case_style: string; book_name?: string };
+type Errs = Partial<Record<Exclude<keyof FormVals, 'scores' | 'book_name'> | 'section_scores' | 'form', string>>;
+const EMPTY: FormVals = { session_date: '', question_type_id: '', prompt: '', format: '', overall_score: '', duration_minutes: '', went_well: '', to_improve: '', story_id: '', case_book_id: '', case_book_publication_year: '', case_style: '' };
 const SAVE_ERROR = "Couldn't save your session. Please try again.";
 const FIX_FIELDS = 'Please fix the highlighted fields.';
 
@@ -439,6 +443,7 @@ function validate(v: FormVals, typeIds: Set<number>): [Errs, SessionInput | null
   }
   const ww = v.went_well.trim(), ti = v.to_improve.trim();
   if (ww.length > 4000) e.went_well = 'Must be 4000 characters or fewer.';
+  if (v.case_book_id) { const ye = editionYearError(v.case_book_publication_year); if (ye) e.case_book_publication_year = ye; }
   if (ti.length > 4000) e.to_improve = 'Must be 4000 characters or fewer.';
   if (Object.keys(e).length) return [e, null];
   return [e, {
@@ -495,8 +500,9 @@ function SessionForm({ initial, submitLabel, busy, onSubmit, cancelHref, serverE
     // for the mount-time refetch before consuming this one-time default.
     if (bookTouched.current || latest === undefined || books.isFetching || books.error) return;
     bookTouched.current = true;
-    if (latest !== null) setV(p => ({ ...p, case_book_id: String(latest) }));
-  }, [latest, books.isFetching, books.error]);
+    const lb = latest !== null ? books.data?.books.find(b => b.id === latest) : undefined;
+    if (lb) setV(p => ({ ...p, case_book_id: String(lb.id), book_name: lb.name, case_book_publication_year: p.case_book_publication_year || (lb.publication_year != null ? String(lb.publication_year) : '') }));
+  }, [latest, books.isFetching, books.error, books.data]);
   const sections = useCaseSections();
   use401(sections.error);
   const formRef = useRef<HTMLFormElement>(null);
@@ -523,7 +529,7 @@ function SessionForm({ initial, submitLabel, busy, onSubmit, cancelHref, serverE
   use401(types.error);
   // Editing infers the initial kind from the saved type once reference data loads.
   const activeKind = kind ?? (types.data?.behavioral.some(t => String(t.id) === initial.question_type_id) ? 'behavioral' : 'case');
-  const set = (k: Exclude<keyof FormVals, 'scores'>) => (val: string) => {
+  const set = (k: Exclude<keyof FormVals, 'scores' | 'book_name'>) => (val: string) => {
     const next = { ...v, [k]: val };
     setV(next);
     const [remaining] = validate(next, new Set((types.data?.[activeKind] ?? []).map(t => t.id)));
@@ -543,7 +549,7 @@ function SessionForm({ initial, submitLabel, busy, onSubmit, cancelHref, serverE
     const ids = new Set((types.data?.[activeKind] ?? []).map(t => t.id));
     const [er, input] = validate(v, ids);
     if (!input) { focusErrors.current = true; setErrs(er); return; }
-    if (activeKind === 'behavioral') { setErrs({}); onSubmit({ ...input, story_id: v.story_id ? Number(v.story_id) : null, case_book_id: null, section_scores: [] }); return; }
+    if (activeKind === 'behavioral') { setErrs({}); onSubmit({ ...input, story_id: v.story_id ? Number(v.story_id) : null, case_book_id: null, case_book_publication_year: null, case_style: null, section_scores: [] }); return; }
     // Never submit a case without the reference list; the scorecard shows a retry.
     const sc = sections.data ? draftsToInput(drafts, sections.data) : null;
     if (!sc) {
@@ -553,7 +559,7 @@ function SessionForm({ initial, submitLabel, busy, onSubmit, cancelHref, serverE
       return;
     }
     setErrs({});
-    onSubmit({ ...input, story_id: null, case_book_id: v.case_book_id ? Number(v.case_book_id) : null, section_scores: sc });
+    onSubmit({ ...input, story_id: null, case_book_id: v.case_book_id ? Number(v.case_book_id) : null, case_book_publication_year: v.case_book_id && v.case_book_publication_year.trim() ? Number(v.case_book_publication_year.trim()) : null, case_style: isStyle(v.case_style) ? v.case_style : null, section_scores: sc });
   }
 
   const counter = (s: string) => <span className="tabular-nums">{s.trim().length}/4000</span>;
@@ -572,10 +578,12 @@ function SessionForm({ initial, submitLabel, busy, onSubmit, cancelHref, serverE
               if (activeKind !== k) {
                 setKind(k);
                 bookTouched.current = true;
-                setV(p => ({ ...p, question_type_id: '', story_id: '', case_book_id: '' }));
+                setV(p => ({ ...p, question_type_id: '', story_id: '', case_book_id: '', case_book_publication_year: '', book_name: undefined, case_style: '' }));
                 setErrs(previous => {
                   const next = { ...previous };
                   delete next.section_scores;
+                  delete next.case_style;
+                  delete next.case_book_publication_year;
                   return next;
                 });
               }
@@ -612,8 +620,27 @@ function SessionForm({ initial, submitLabel, busy, onSubmit, cancelHref, serverE
           <CaseBookSelect id="case_book_id" className={inputCls} value={v.case_book_id} disabled={busy}
             invalid={!!errs.case_book_id} describedBy={errs.case_book_id ? 'case_book_id-err' : undefined}
             style={{ borderColor: errs.case_book_id ? '#C0392B' : undefined }}
-            onChange={val => { bookTouched.current = true; set('case_book_id')(val); }} onAddingChange={setAddingBook} />
+            knownName={v.book_name}
+            onChange={(val, name) => {
+              bookTouched.current = true;
+              const sameName = !!val && !!name && !!v.book_name && normBookName(name) === normBookName(v.book_name);
+              setV(p => ({ ...p, case_book_id: val, book_name: name ?? undefined, case_book_publication_year: sameName ? p.case_book_publication_year : '' }));
+              setErrs(previous => { const next = { ...previous }; delete next.case_book_id; if (!sameName) delete next.case_book_publication_year; return next; });
+            }} onAddingChange={setAddingBook} />
         </FieldWrap>
+      )}
+
+      {activeKind === 'case' && types.data && v.case_book_id && (
+        <FieldWrap id="case_book_publication_year" label="Edition year" optional error={errs.case_book_publication_year} hint="Leave blank if you are not sure.">
+          <input {...aria('case_book_publication_year', errs.case_book_publication_year, true)} type="text" inputMode="numeric" maxLength={4}
+            data-testid="input-edition-year" placeholder="e.g. 2024" disabled={busy}
+            className={`${inputCls} max-w-[9rem]`} value={v.case_book_publication_year}
+            onChange={e => set('case_book_publication_year')(e.target.value)} />
+        </FieldWrap>
+      )}
+
+      {activeKind === 'case' && types.data && (
+        <StylePicker value={v.case_style} onChange={set('case_style')} disabled={busy} error={errs.case_style} />
       )}
 
       {activeKind === 'behavioral' && types.data && (
@@ -754,6 +781,9 @@ const toVals = (s: PracticeSessionDetail): FormVals => ({
   went_well: s.went_well ?? '', to_improve: s.to_improve ?? '',
   story_id: s.kind === 'behavioral' && s.story_id != null ? String(s.story_id) : '',
   case_book_id: s.kind === 'case' && s.case_book_id != null ? String(s.case_book_id) : '',
+  case_book_publication_year: s.kind === 'case' && s.case_book_id != null && s.case_book_publication_year != null ? String(s.case_book_publication_year) : '',
+  book_name: s.kind === 'case' && s.case_book_name ? s.case_book_name : undefined,
+  case_style: s.kind === 'case' && isStyle(s.case_style) ? s.case_style : '',
 });
 
 export function EditSessionPage({ rawId }: { rawId?: string }) {

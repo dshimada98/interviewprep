@@ -3,11 +3,12 @@ import { useLocation, useSearch } from 'wouter';
 import { ChevronDown, Search, SlidersHorizontal, X } from 'lucide-react';
 import {
   getGetQuestionTypesQueryKey, useGetQuestionTypes,
-  type GroupedQuestionTypes, type ListSessionsKind, type ListSessionsParams, type ListSessionsScore, type ListSessionsSort,
+  type GroupedQuestionTypes, type ListSessionsKind, type ListSessionsParams, type ListSessionsScore, type ListSessionsSort, type ListSessionsStyle,
 } from '@workspace/api-client-react';
 import { sessionRequestOptions, useAuth } from '@/auth';
 import { NO_BOOK, useCaseBooks } from './case-book-select';
 import { caseBookLabel } from './case-book-label';
+import { STYLES } from './interview-style';
 
 const KINDS: { v: ListSessionsKind | ''; label: string }[] = [{ v: '', label: 'All' }, { v: 'case', label: 'Case' }, { v: 'behavioral', label: 'Behavioral' }];
 const SCORES: { v: ListSessionsScore | ''; label: string; color: string }[] = [
@@ -16,16 +17,17 @@ const SCORES: { v: ListSessionsScore | ''; label: string; color: string }[] = [
   { v: 'mid', label: '3', color: 'var(--score-3)' },
   { v: 'high', label: '4-5', color: 'var(--score-5)' },
 ];
+const STYLE_OPTS: { v: ListSessionsStyle | ''; label: string }[] = [{ v: '', label: 'Any' }, ...STYLES, { v: 'not_set', label: 'Not set' }];
 const SORTS: { v: ListSessionsSort; label: string }[] = [
   { v: 'newest', label: 'Newest first' }, { v: 'oldest', label: 'Oldest first' },
   { v: 'highest', label: 'Highest score' }, { v: 'lowest', label: 'Lowest score' },
 ];
 
-export type FinderState = { q: string; kind: ListSessionsKind | ''; type: number | null; score: ListSessionsScore | ''; sort: ListSessionsSort; book: string };
+export type FinderState = { q: string; kind: ListSessionsKind | ''; type: number | null; score: ListSessionsScore | ''; sort: ListSessionsSort; book: string; style: ListSessionsStyle | '' };
 
 function parse(search: string): FinderState {
   const p = new URLSearchParams(search);
-  const kind = p.get('kind'), score = p.get('score'), sort = p.get('sort'), type = p.get('type') ?? '', book = p.get('book') ?? '';
+  const kind = p.get('kind'), score = p.get('score'), sort = p.get('sort'), type = p.get('type') ?? '', book = p.get('book') ?? '', style = p.get('style') ?? '';
   const t = /^\d{1,10}$/.test(type) ? Number(type) : NaN;
   return {
     q: p.get('q') ?? '',
@@ -33,6 +35,7 @@ function parse(search: string): FinderState {
     type: Number.isSafeInteger(t) && t > 0 && t <= 2147483647 ? t : null,
     score: score === 'low' || score === 'mid' || score === 'high' ? score : '',
     sort: SORTS.some(s => s.v === sort) ? (sort as ListSessionsSort) : 'newest',
+    style: STYLE_OPTS.some(o => o.v && o.v === style) ? (style as ListSessionsStyle) : '',
     book: book === 'none' || (/^\d{1,10}$/.test(book) && Number(book) > 0 && Number(book) <= 2147483647) ? book : '',
   };
 }
@@ -43,6 +46,7 @@ function serialize(s: FinderState) {
   if (s.type !== null) p.set('type', String(s.type));
   if (s.score) p.set('score', s.score);
   if (s.book) p.set('book', s.book);
+  if (s.style) p.set('style', s.style);
   if (s.sort !== 'newest') p.set('sort', s.sort);
   const str = p.toString();
   return str ? `/sessions?${str}` : '/sessions';
@@ -118,8 +122,9 @@ export function useSessionFinder() {
     score: state.score || undefined,
     sort: state.sort === 'newest' ? undefined : state.sort,
     book: state.book || undefined,
+    style: state.style || undefined,
   };
-  const filterCount = (state.kind ? 1 : 0) + (state.type !== null ? 1 : 0) + (state.score ? 1 : 0) + (state.book ? 1 : 0) + (state.sort !== 'newest' ? 1 : 0);
+  const filterCount = (state.kind ? 1 : 0) + (state.type !== null ? 1 : 0) + (state.score ? 1 : 0) + (state.book ? 1 : 0) + (state.style ? 1 : 0) + (state.sort !== 'newest' ? 1 : 0);
   const active = filterCount > 0 || !!state.q.trim() || !!text.trim();
   return { state, text, params, ready: !typePending && !bookPending, grouped, books: books.data?.books, booksError: !!books.error, typesError: !!types.error, filterCount, active, setSearch, setKind, update, clear };
 }
@@ -200,6 +205,15 @@ export function FinderControls({ f }: { f: SessionFinder }) {
               <option value="">{f.booksError ? 'Books unavailable' : f.books ? 'All books' : 'Loading books'}</option>
               <option value="none">{NO_BOOK}</option>
               {(f.books ?? []).map(b => <option key={b.id} value={String(b.id)}>{caseBookLabel(b.name, b.publication_year)}{b.user_id != null ? ' (custom)' : ''}</option>)}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2" aria-hidden />
+          </span>
+        </label>
+        <label className="block min-w-0 lg:flex-1 lg:max-w-[180px]"><FieldLabel>Interview style</FieldLabel>
+          <span className="relative block">
+            <select data-testid="select-filter-style" className={selCls}
+              value={state.style} onChange={e => f.update({ style: e.target.value as FinderState['style'] })}>
+              {STYLE_OPTS.map(o => <option key={o.v || 'any'} value={o.v}>{o.label}</option>)}
             </select>
             <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2" aria-hidden />
           </span>

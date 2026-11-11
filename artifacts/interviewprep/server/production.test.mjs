@@ -15,21 +15,33 @@ if (process.env.PRODUCTION_TEST_CHILD === '1') {
   const { pool } = await import('./db.mjs');
   const { seedQuestionTypes, questionTypeSeeds } = await import('./question-types.mjs');
   const { seedCaseSections, caseSectionSeeds } = await import('./case-sections.mjs');
+  const { seedCaseBooks } = await import('./case-books.mjs');
   test('fresh provisioned schema: production signup, refresh, logout and login', async () => {
     const https = req => req.set('X-Forwarded-Proto', 'https');
     try {
       // The same seeder used by startup, with production NODE_ENV and a freshly
       // provisioned isolated development schema. No live production writes.
+      const legacyOwner = (await pool.query(`INSERT INTO users(email,password_hash)
+        VALUES ('legacy-category@example.test','test-only-not-a-login-account') RETURNING id`)).rows[0];
+      const legacyType = (await pool.query(`INSERT INTO question_types(name,kind,user_id)
+        VALUES ('Wildcard','behavioral',$1) RETURNING id`, [legacyOwner.id])).rows[0];
+      const legacySession = (await pool.query(`INSERT INTO practice_sessions
+        (user_id,question_type_id,session_date,prompt,overall_score)
+        VALUES ($1,$2,'2026-01-01','Legacy custom category',3) RETURNING id`,
+      [legacyOwner.id, legacyType.id])).rows[0];
       await seedQuestionTypes();
       await seedCaseSections();
       const caseSeeded = (await pool.query('SELECT id, name, display_order FROM case_sections ORDER BY display_order')).rows;
       await Promise.all([seedCaseSections(), seedCaseSections()]);
       assert.deepEqual((await pool.query('SELECT id, name, display_order FROM case_sections ORDER BY display_order')).rows, caseSeeded);
       assert.deepEqual(caseSeeded.map(row => row.name), caseSectionSeeds);
-      const seeded = (await pool.query('SELECT id, name, kind FROM question_types ORDER BY id')).rows;
+      const seeded = (await pool.query('SELECT id, name, kind FROM question_types WHERE user_id IS NULL ORDER BY id')).rows;
       await Promise.all([seedQuestionTypes(), seedQuestionTypes()]);
-      assert.deepEqual((await pool.query('SELECT id, name, kind FROM question_types ORDER BY id')).rows, seeded);
+      assert.deepEqual((await pool.query('SELECT id, name, kind FROM question_types WHERE user_id IS NULL ORDER BY id')).rows, seeded);
       assert.equal(seeded.length, questionTypeSeeds.length);
+      assert.equal((await pool.query('SELECT question_type_id FROM practice_sessions WHERE id=$1',
+        [legacySession.id])).rows[0].question_type_id, legacyType.id);
+      assert.equal((await pool.query('SELECT kind FROM question_types WHERE id=$1', [legacyType.id])).rows[0].kind, 'behavioral');
       await https(request(app).get('/api/question-types')).expect(401);
       const status = await https(request(app).get('/api/auth/status')).expect(200);
       const firstCookie = status.headers['set-cookie'][0].split(';')[0];
@@ -48,8 +60,25 @@ if (process.env.PRODUCTION_TEST_CHILD === '1') {
       await https(request(app).get('/api/me')).set('Cookie', signedCookie.split(';')[0]).expect(200);
       const areas = await https(request(app).get('/api/question-types'))
         .set('Cookie', signedCookie.split(';')[0]).expect(200);
-      assert.equal(areas.body.case.length, 7);
+      assert.equal(areas.body.case.length, 9);
+      assert.ok(areas.body.case.some(q => q.name === 'Private Equity' && q.kind === 'case'));
+      assert.ok(areas.body.case.some(q => q.name === 'Wildcard' && q.kind === 'case'));
       assert.equal(areas.body.behavioral.length, 17);
+      // A book created before it became a shared seed keeps its ID and links.
+      const privateBook = (await pool.query('INSERT INTO case_books(name,user_id) VALUES ($1,$2) RETURNING id',
+        ['Booth Casebook', refresh.body.user.id])).rows[0];
+      const practice = (await pool.query(`INSERT INTO practice_sessions
+        (user_id,question_type_id,session_date,prompt,overall_score,case_book_id)
+        VALUES ($1,$2,'2026-01-01','Legacy Booth session',3,$3) RETURNING id`,
+      [refresh.body.user.id, areas.body.case[0].id, privateBook.id])).rows[0];
+      await seedCaseBooks();
+      await seedCaseBooks();
+      const books = (await https(request(app).get('/api/case-books'))
+        .set('Cookie', signedCookie.split(';')[0]).expect(200)).body.books;
+      assert.equal(books.filter(b => b.name === 'Booth Casebook' && b.user_id === null).length, 1);
+      assert.ok(books.some(b => b.id === privateBook.id && b.user_id === refresh.body.user.id));
+      assert.equal((await pool.query('SELECT case_book_id FROM practice_sessions WHERE id=$1',
+        [practice.id])).rows[0].case_book_id, privateBook.id);
       const sections = await https(request(app).get('/api/case-sections'))
         .set('Cookie', signedCookie.split(';')[0]).expect(200);
       assert.deepEqual(sections.body.map(row => row.name), caseSectionSeeds);

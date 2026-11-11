@@ -64,6 +64,30 @@ export type StoryDetail = StorySummary & {
   sessions: StoryUsage[];
 };
 
+/**
+ * @nullable
+ */
+export type CaseStyle = typeof CaseStyle[keyof typeof CaseStyle] | null;
+
+
+export const CaseStyle = {
+  interviewer_led: 'interviewer_led',
+  candidate_led: 'candidate_led',
+  not_sure: 'not_sure',
+} as const;
+
+export interface DashboardCaseStyle {
+  case_style: CaseStyle | null;
+  name: string;
+  count: number;
+  average_score: number;
+  /**
+     * Lowest-average section scored at least twice within this style.
+     * @nullable
+     */
+  weakest_section: string | null;
+}
+
 export interface SectionProgressScore {
   section_id: number;
   /** @nullable */
@@ -177,6 +201,7 @@ export interface DashboardHeatmapSession {
 }
 
 export interface DashboardSummary {
+  by_case_style: DashboardCaseStyle[];
   section_progress: SectionProgress;
   by_case_book: DashboardCaseBook[];
   /** @maxItems 2 */
@@ -242,8 +267,8 @@ export interface ChecklistList {
 
 export interface CaseBookInput {
   /**
-     * @minimum 1000
-     * @maximum 9999
+     * Optional whole year, no later than next calendar year. The session form's inline add sends only a name.
+     * @minimum 1990
      * @nullable
      */
   publication_year?: number | null;
@@ -300,6 +325,13 @@ export const SessionInputFormat = {
 } as const;
 
 export interface SessionInput {
+  /**
+     * Optional typed edition year, at most next calendar year. Blank/omitted/null means unknown. A visible chosen book ID supplies the name; the server resolves shared edition, then owned edition, then creates an owned edition.
+     * @minimum 1990
+     * @nullable
+     */
+  case_book_publication_year?: number | null;
+  case_style?: CaseStyle | null;
   /**
      * Optional shared or owned case book. Omitted/null clears the link; behavioral sessions always clear it.
      * @minimum 1
@@ -466,6 +498,10 @@ export const GetDashboardRange = {
 } as const;
 
 export type ListSessionsParams = {
+/**
+ * Case interview style; not_set selects case sessions without a style.
+ */
+style?: ListSessionsStyle;
 q?: string;
 kind?: ListSessionsKind;
 type?: number;
@@ -480,6 +516,16 @@ sort?: ListSessionsSort;
  */
 starred?: boolean;
 };
+
+export type ListSessionsStyle = typeof ListSessionsStyle[keyof typeof ListSessionsStyle];
+
+
+export const ListSessionsStyle = {
+  interviewer_led: 'interviewer_led',
+  candidate_led: 'candidate_led',
+  not_sure: 'not_sure',
+  not_set: 'not_set',
+} as const;
 
 export type ListSessionsKind = typeof ListSessionsKind[keyof typeof ListSessionsKind];
 

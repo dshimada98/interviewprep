@@ -98,6 +98,20 @@ export async function getDashboard(userId, database = pool, range = 'last10') {
           ORDER BY c.session_date DESC, c.created_at DESC, c.id DESC
           LIMIT 1
         ) n ON true) AS next_case_focus,
+      (SELECT coalesce(jsonb_agg(jsonb_build_object(
+        'case_style', g.case_style,
+        'name', CASE g.case_style WHEN 'interviewer_led' THEN 'Interviewer-led'
+          WHEN 'candidate_led' THEN 'Candidate-led' WHEN 'not_sure' THEN 'Not sure' ELSE 'Not set' END,
+        'count', g.count, 'average_score', g.average_score,
+        'weakest_section', (SELECT s.name FROM section_scores sc
+          JOIN cases c ON c.id=sc.session_id JOIN case_sections s ON s.id=sc.section_id
+          WHERE c.case_style IS NOT DISTINCT FROM g.case_style
+          GROUP BY s.id,s.name,s.display_order HAVING count(sc.score)>=2
+          ORDER BY avg(sc.score),s.display_order,s.id LIMIT 1)
+        ) ORDER BY CASE g.case_style WHEN 'interviewer_led' THEN 1
+          WHEN 'candidate_led' THEN 2 WHEN 'not_sure' THEN 3 ELSE 4 END), '[]'::jsonb)
+        FROM (SELECT case_style,count(*)::int AS count,round(avg(overall_score),1) AS average_score
+          FROM cases GROUP BY case_style) g) AS by_case_style,
       (SELECT count(*)::int FROM cases) AS total_cases,
       (SELECT round(avg(overall_score), 1) FROM cases)::float8 AS average_case_score,
       (SELECT jsonb_build_object('name', name, 'average_score', round(average, 1))

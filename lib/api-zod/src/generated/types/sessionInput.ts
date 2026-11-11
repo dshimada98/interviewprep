@@ -5,10 +5,18 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { CaseStyle } from './caseStyle';
 import type { SectionScoreInput } from './sectionScoreInput';
 import type { SessionInputFormat } from './sessionInputFormat';
 
 export interface SessionInput {
+  /**
+     * Optional typed edition year, at most next calendar year. Blank/omitted/null means unknown. A visible chosen book ID supplies the name; the server resolves shared edition, then owned edition, then creates an owned edition.
+     * @minimum 1990
+     * @nullable
+     */
+  case_book_publication_year?: number | null;
+  case_style?: CaseStyle | null;
   /**
      * Optional shared or owned case book. Omitted/null clears the link; behavioral sessions always clear it.
      * @minimum 1

@@ -8,8 +8,8 @@
 
 export interface CaseBookInput {
   /**
-     * @minimum 1000
-     * @maximum 9999
+     * Optional whole year, no later than next calendar year. The session form's inline add sends only a name.
+     * @minimum 1990
      * @nullable
      */
   publication_year?: number | null;

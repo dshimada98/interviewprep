@@ -1,5 +1,5 @@
 import { z } from 'zod/v4';
-import { visibleCaseBook } from './case-books.mjs';
+import { visibleCaseBook, resolveCaseBookEdition, publicationYearError } from './case-books.mjs';
 
 const messages = {
   date: 'Please pick the date of your session.',
@@ -32,6 +32,13 @@ const input = z.object({
   to_improve: notes,
   story_id: integer(1, 2147483647, 'Please choose one of your stories.').nullable().optional(),
   case_book_id: integer(1, 2147483647, 'Please choose a case book.').nullable().optional(),
+  case_book_publication_year: z.preprocess(value => value === '' ? null : value,
+    z.number({ error: publicationYearError }).int({ error: publicationYearError }).min(1990, { error: publicationYearError })
+      .refine(value => value <= new Date().getFullYear() + 1, { error: publicationYearError }).nullable().optional()),
+  case_style: z.preprocess(value => value === '' ? null : value,
+    z.enum(['interviewer_led', 'candidate_led', 'not_sure'], {
+      error: 'Please choose an interview style from the list.',
+    }).nullable().optional()),
   section_scores: z.array(z.object({
     section_id: integer(1, 2147483647, messages.section),
     score: integer(1, 5, messages.section),
@@ -85,11 +92,15 @@ export async function validateSession(body, database, userId) {
   }
   if (!result.success || Object.keys(errors).length) return { errors };
   const data = result.data;
+  const bookId = kind === 'case' && data.case_book_id != null
+    ? await resolveCaseBookEdition(database, data.case_book_id, data.case_book_publication_year ?? null, userId)
+    : null;
   return {
     values: [data.question_type_id, data.session_date, data.prompt, data.format,
       data.overall_score, data.duration_minutes ?? null, data.went_well || null, data.to_improve || null,
       kind === 'behavioral' ? data.story_id ?? null : null,
-      kind === 'case' ? data.case_book_id ?? null : null],
+      bookId,
+      kind === 'case' ? data.case_style ?? null : null],
     scores: data.section_scores,
   };
 }

@@ -50,10 +50,22 @@ choice, not missing data to replace with an older book.
 Different publication years are separate case-book editions, not an editable
 year on a single shared identity. Unknown years remain blank.
 
-**Why:** The user explicitly chose “Separate books by year.”
+**Why:** The user explicitly chose “Separate books by year,” and later requested
+freely typed edition years while retaining edition-specific filters and history.
 
 **How to apply:** Keep edition-specific sessions, filters, dashboard counts, and
 defaults distinct; do not merge books merely because their titles match.
+Changing the form's year means choosing another edition, never renaming or
+changing the year of the previously linked book.
+
+New shared reference books must not replace existing private books or relink
+their historical sessions, even when the normalized name and year match.
+
+**Why:** The user explicitly required existing private “Booth Casebook” session
+links to survive its addition to shared reference data.
+
+**How to apply:** Preserve historical book IDs during catalog expansion; shared
+and legacy private editions can coexist without rewriting practice history.
 
 Copying a session note into the checklist must not silently truncate or summarize
 it. An over-limit note should give a friendly error and let the user write a

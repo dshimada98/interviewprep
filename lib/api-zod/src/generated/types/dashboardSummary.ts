@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { DashboardCaseBook } from './dashboardCaseBook';
+import type { DashboardCaseStyle } from './dashboardCaseStyle';
 import type { DashboardCaseType } from './dashboardCaseType';
 import type { DashboardHeatmapSession } from './dashboardHeatmapSession';
 import type { DashboardSectionAverage } from './dashboardSectionAverage';
@@ -14,6 +15,7 @@ import type { NextCaseFocusSection } from './nextCaseFocusSection';
 import type { SectionProgress } from './sectionProgress';
 
 export interface DashboardSummary {
+  by_case_style: DashboardCaseStyle[];
   section_progress: SectionProgress;
   by_case_book: DashboardCaseBook[];
   /** @maxItems 2 */

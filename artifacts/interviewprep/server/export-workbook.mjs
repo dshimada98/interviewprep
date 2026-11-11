@@ -101,11 +101,13 @@ export function buildExportWorkbook(data, today) {
     notesBySession.get(n.session_id).set(n.section_name, n.score);
   }
   table(workbook.addWorksheet('Cases'), [dateCol, col('Case book', 36, { wrap: true }),
+    col('Interview style', 22),
     col('Case type', 26), longCol('Prompt'), col('Format', 14), scoreCol('Overall score'),
     ...caseSectionSeeds.map(scoreCol), longCol('What went well'), longCol('What to improve'), col('Starred', 12)],
   data.sessions.filter(s => s.kind === 'case').map(s => [
     date(s.session_date), s.case_book_name == null ? 'No book / live case'
       : `${s.case_book_name}${s.publication_year == null ? '' : ` (${s.publication_year})`}`,
+    ({ interviewer_led: 'Interviewer-led', candidate_led: 'Candidate-led', not_sure: 'Not sure' })[s.case_style] ?? null,
     text(s.question_type_name), text(s.prompt), text(s.format), s.overall_score,
     ...caseSectionSeeds.map(name => notesBySession.get(s.id)?.get(name) ?? null),
     text(s.went_well), text(s.to_improve), s.starred ? 'Yes' : 'No',

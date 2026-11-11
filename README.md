@@ -11,7 +11,9 @@ Live URL: myinterviewprep.replit.app
 - **Private accounts:** Sign up, log in, and log out; each account can access only its own practice data.
 - **Practice log:** Create, view, edit, and delete case and behavioral sessions with dates, prompts, formats, scores, and feedback.
 - **Case scorecards:** Score seven case sections individually, record what went well and what to improve, and leave unscored sections as N/A.
-- **Case books:** Organize cases by book and publication year, add private books, and review practice by book.
+- **Case books:** Choose a book name once, optionally type its edition year, and reuse or create a private edition automatically; add private names, including alongside shared books such as Booth Casebook, and review distinct editions by book.
+- **Case categories:** Practice shared case types including Private Equity and Wildcard.
+- **Interview styles:** Optionally log interviewer-led, candidate-led, or unsure cases; filter sessions, compare style averages and weakest sections, and export the style to Excel.
 - **Behavioral categories:** Use built-in question types or add private custom categories.
 - **STAR story bank:** Save stories by competency, link them to behavioral practice, and track practice counts and average scores.
 - **Dashboard:** Review practice totals and question-type breakdowns, plus a Section progress card with case/weekly trends, heatmaps, all-time averages, and recent-versus-earlier section comparisons.
@@ -58,7 +60,7 @@ Run commands from the repository root. This is a **pnpm workspace**: use pnpm to
    psql --dbname="$DATABASE_URL" -v ON_ERROR_STOP=1 -f artifacts/interviewprep/server/schema.sql
    ```
 
-   This command changes the database selected by `DATABASE_URL`. The server expects the schema to exist; it does not create or migrate tables at startup. See [schema.md](schema.md) for database structure and provisioning details.
+   This command changes the database selected by `DATABASE_URL`. For an existing database, apply the updated idempotent schema before starting this version as well: it adds the nullable `case_style` column and allows new shared seeds without relinking legacy private books. The server expects the schema to exist; it does not create or migrate tables at startup. See [schema.md](schema.md) for database structure and provisioning details.
 
 5. **Start InterviewPrep.**
 

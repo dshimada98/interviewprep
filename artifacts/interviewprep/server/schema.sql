@@ -36,8 +36,7 @@ BEGIN
   END IF;
   IF EXISTS (SELECT 1 FROM question_types q WHERE q.id <> NEW.id
       AND category_name_key(q.name) = category_name_key(NEW.name)
-      AND ((NEW.user_id IS NULL AND q.user_id IS NOT NULL)
-        OR (NEW.user_id IS NOT NULL AND q.user_id IS NULL))) THEN
+      AND NEW.user_id IS NOT NULL AND q.user_id IS NULL) THEN
     RAISE EXCEPTION 'Duplicate category' USING ERRCODE = '23505';
   END IF;
   RETURN NEW;
@@ -65,8 +64,9 @@ BEGIN
   IF EXISTS (SELECT 1 FROM case_books b WHERE b.id <> NEW.id
       AND category_name_key(b.name) = category_name_key(NEW.name)
       AND b.publication_year IS NOT DISTINCT FROM NEW.publication_year
-      AND ((NEW.user_id IS NULL AND b.user_id IS NOT NULL)
-        OR (NEW.user_id IS NOT NULL AND b.user_id IS NULL))) THEN
+      -- New shared seeds may coexist with legacy private books. Never relink
+      -- those sessions; only prevent creating a NEW private/shared duplicate.
+      AND NEW.user_id IS NOT NULL AND b.user_id IS NULL) THEN
     RAISE EXCEPTION 'Duplicate case book' USING ERRCODE = '23505';
   END IF;
   RETURN NEW;
@@ -111,6 +111,8 @@ ALTER TABLE practice_sessions
   ADD COLUMN IF NOT EXISTS story_id INTEGER REFERENCES stories(id) ON DELETE SET NULL;
 ALTER TABLE practice_sessions
   ADD COLUMN IF NOT EXISTS case_book_id INTEGER REFERENCES case_books(id) ON DELETE SET NULL;
+ALTER TABLE practice_sessions ADD COLUMN IF NOT EXISTS case_style TEXT
+  CHECK (case_style IN ('interviewer_led', 'candidate_led', 'not_sure'));
 CREATE INDEX IF NOT EXISTS practice_sessions_case_book_id_idx ON practice_sessions (case_book_id);
 CREATE INDEX IF NOT EXISTS practice_sessions_story_id_idx ON practice_sessions (story_id);
 

@@ -9,6 +9,8 @@ export const questionTypeSeeds = [
   ['Growth Strategy', 'case'],
   ['Pricing', 'case'],
   ['Operations', 'case'],
+  ['Private Equity', 'case'],
+  ['Wildcard', 'case'],
   ['Leadership', 'behavioral'],
   ['Teamwork', 'behavioral'],
   ['Conflict', 'behavioral'],

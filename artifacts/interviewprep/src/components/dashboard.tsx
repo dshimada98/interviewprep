@@ -8,6 +8,7 @@ import { PracticeAreas } from './practice-areas';
 import { NextCaseFocus } from './next-case-focus';
 import { ChecklistCard } from './checklist';
 import { ByCaseBook } from './case-book-panel';
+import { ByInterviewStyle } from './interview-style';
 import { ExportButton } from './export-button';
 import { dashboardKey, statusOf } from './session-keys';
 import { SectionProgressCard } from './section-progress';
@@ -142,6 +143,7 @@ export function DashboardPage() {
             <Stats d={d} />
             <CasesByType d={d} />
             <ByCaseBook d={d} scoreColor={bandColor} />
+            <ByInterviewStyle d={d} scoreColor={bandColor} />
           </div>
         ) : null}
 

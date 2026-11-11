@@ -352,6 +352,13 @@ export const getDashboardResponseNextCaseFocusMax = 2;
 
 
 export const GetDashboardResponse = zod.object({
+  "by_case_style": zod.array(zod.object({
+  "case_style": zod.union([zod.literal('interviewer_led'),zod.literal('candidate_led'),zod.literal('not_sure'),zod.literal(null)]).nullable(),
+  "name": zod.string(),
+  "count": zod.number().int(),
+  "average_score": zod.number(),
+  "weakest_section": zod.string().nullable().describe('Lowest-average section scored at least twice within this style.')
+})),
   "section_progress": zod.object({
   "cases": zod.array(zod.object({
   "id": zod.number().int(),
@@ -447,6 +454,7 @@ export const GetCaseSectionsResponse = zod.array(GetCaseSectionsResponseItem)
 
 
 export const ListSessionsQueryParams = zod.object({
+  "style": zod.enum(['interviewer_led', 'candidate_led', 'not_sure', 'not_set']).optional().describe('Case interview style; not_set selects case sessions without a style.'),
   "q": zod.coerce.string().optional(),
   "kind": zod.enum(['case', 'behavioral']).optional(),
   "type": zod.coerce.number().int().optional(),
@@ -455,6 +463,8 @@ export const ListSessionsQueryParams = zod.object({
   "sort": zod.enum(['newest', 'oldest', 'highest', 'lowest']).optional(),
   "starred": zod.coerce.boolean().optional().describe('When true, return only the current user\'s starred sessions.')
 })
+
+export const listSessionsResponseSessionsItemOneCaseBookPublicationYearMin = 1990;
 
 export const listSessionsResponseSessionsItemOneCaseBookIdMax = 2147483647;
 
@@ -487,6 +497,8 @@ export const listSessionsResponseSessionsItemOneToImproveMax = 4000;
 
 export const ListSessionsResponse = zod.object({
   "sessions": zod.array(zod.object({
+  "case_book_publication_year": zod.number().int().min(listSessionsResponseSessionsItemOneCaseBookPublicationYearMin).nullable().describe('Optional typed edition year, at most next calendar year. Blank/omitted/null means unknown. A visible chosen book ID supplies the name; the server resolves shared edition, then owned edition, then creates an owned edition.'),
+  "case_style": zod.union([zod.literal('interviewer_led'),zod.literal('candidate_led'),zod.literal('not_sure'),zod.literal(null)]).nullish(),
   "case_book_id": zod.number().int().min(1).max(listSessionsResponseSessionsItemOneCaseBookIdMax).nullable().describe('Optional shared or owned case book. Omitted/null clears the link; behavioral sessions always clear it.'),
   "story_id": zod.number().int().min(1).max(listSessionsResponseSessionsItemOneStoryIdMax).nullable().describe('Optional owned story for behavioral sessions. Omitted/null clears the link; a case session always clears it.'),
   "section_scores": zod.array(zod.object({
@@ -519,6 +531,8 @@ export const ListSessionsResponse = zod.object({
 })
 
 
+export const createSessionBodyCaseBookPublicationYearMin = 1990;
+
 export const createSessionBodyCaseBookIdMax = 2147483647;
 
 export const createSessionBodyStoryIdMax = 2147483647;
@@ -549,6 +563,8 @@ export const createSessionBodyToImproveMax = 4000;
 
 
 export const CreateSessionBody = zod.object({
+  "case_book_publication_year": zod.number().int().min(createSessionBodyCaseBookPublicationYearMin).nullish().describe('Optional typed edition year, at most next calendar year. Blank/omitted/null means unknown. A visible chosen book ID supplies the name; the server resolves shared edition, then owned edition, then creates an owned edition.'),
+  "case_style": zod.union([zod.literal('interviewer_led'),zod.literal('candidate_led'),zod.literal('not_sure'),zod.literal(null)]).nullish(),
   "case_book_id": zod.number().int().min(1).max(createSessionBodyCaseBookIdMax).nullish().describe('Optional shared or owned case book. Omitted/null clears the link; behavioral sessions always clear it.'),
   "story_id": zod.number().int().min(1).max(createSessionBodyStoryIdMax).nullish().describe('Optional owned story for behavioral sessions. Omitted/null clears the link; a case session always clears it.'),
   "section_scores": zod.array(zod.object({
@@ -566,6 +582,8 @@ export const CreateSessionBody = zod.object({
   "went_well": zod.string().max(createSessionBodyWentWellMax).nullish(),
   "to_improve": zod.string().max(createSessionBodyToImproveMax).nullish()
 })
+
+export const createSessionResponseOneOneCaseBookPublicationYearMin = 1990;
 
 export const createSessionResponseOneOneCaseBookIdMax = 2147483647;
 
@@ -605,6 +623,8 @@ export const createSessionResponseTwoSectionScoresItemOneToImproveMax = 4000;
 
 
 export const CreateSessionResponse = zod.object({
+  "case_book_publication_year": zod.number().int().min(createSessionResponseOneOneCaseBookPublicationYearMin).nullable().describe('Optional typed edition year, at most next calendar year. Blank/omitted/null means unknown. A visible chosen book ID supplies the name; the server resolves shared edition, then owned edition, then creates an owned edition.'),
+  "case_style": zod.union([zod.literal('interviewer_led'),zod.literal('candidate_led'),zod.literal('not_sure'),zod.literal(null)]).nullish(),
   "case_book_id": zod.number().int().min(1).max(createSessionResponseOneOneCaseBookIdMax).nullable().describe('Optional shared or owned case book. Omitted/null clears the link; behavioral sessions always clear it.'),
   "story_id": zod.number().int().min(1).max(createSessionResponseOneOneStoryIdMax).nullable().describe('Optional owned story for behavioral sessions. Omitted/null clears the link; a case session always clears it.'),
   "section_scores": zod.array(zod.object({
@@ -670,6 +690,8 @@ export const GetSessionParams = zod.object({
   "id": zod.coerce.number().int()
 })
 
+export const getSessionResponseOneOneCaseBookPublicationYearMin = 1990;
+
 export const getSessionResponseOneOneCaseBookIdMax = 2147483647;
 
 export const getSessionResponseOneOneStoryIdMax = 2147483647;
@@ -708,6 +730,8 @@ export const getSessionResponseTwoSectionScoresItemOneToImproveMax = 4000;
 
 
 export const GetSessionResponse = zod.object({
+  "case_book_publication_year": zod.number().int().min(getSessionResponseOneOneCaseBookPublicationYearMin).nullable().describe('Optional typed edition year, at most next calendar year. Blank/omitted/null means unknown. A visible chosen book ID supplies the name; the server resolves shared edition, then owned edition, then creates an owned edition.'),
+  "case_style": zod.union([zod.literal('interviewer_led'),zod.literal('candidate_led'),zod.literal('not_sure'),zod.literal(null)]).nullish(),
   "case_book_id": zod.number().int().min(1).max(getSessionResponseOneOneCaseBookIdMax).nullable().describe('Optional shared or owned case book. Omitted/null clears the link; behavioral sessions always clear it.'),
   "story_id": zod.number().int().min(1).max(getSessionResponseOneOneStoryIdMax).nullable().describe('Optional owned story for behavioral sessions. Omitted/null clears the link; a case session always clears it.'),
   "section_scores": zod.array(zod.object({
@@ -753,6 +777,8 @@ export const UpdateSessionParams = zod.object({
   "id": zod.coerce.number().int()
 })
 
+export const updateSessionBodyCaseBookPublicationYearMin = 1990;
+
 export const updateSessionBodyCaseBookIdMax = 2147483647;
 
 export const updateSessionBodyStoryIdMax = 2147483647;
@@ -783,6 +809,8 @@ export const updateSessionBodyToImproveMax = 4000;
 
 
 export const UpdateSessionBody = zod.object({
+  "case_book_publication_year": zod.number().int().min(updateSessionBodyCaseBookPublicationYearMin).nullish().describe('Optional typed edition year, at most next calendar year. Blank/omitted/null means unknown. A visible chosen book ID supplies the name; the server resolves shared edition, then owned edition, then creates an owned edition.'),
+  "case_style": zod.union([zod.literal('interviewer_led'),zod.literal('candidate_led'),zod.literal('not_sure'),zod.literal(null)]).nullish(),
   "case_book_id": zod.number().int().min(1).max(updateSessionBodyCaseBookIdMax).nullish().describe('Optional shared or owned case book. Omitted/null clears the link; behavioral sessions always clear it.'),
   "story_id": zod.number().int().min(1).max(updateSessionBodyStoryIdMax).nullish().describe('Optional owned story for behavioral sessions. Omitted/null clears the link; a case session always clears it.'),
   "section_scores": zod.array(zod.object({
@@ -800,6 +828,8 @@ export const UpdateSessionBody = zod.object({
   "went_well": zod.string().max(updateSessionBodyWentWellMax).nullish(),
   "to_improve": zod.string().max(updateSessionBodyToImproveMax).nullish()
 })
+
+export const updateSessionResponseOneOneCaseBookPublicationYearMin = 1990;
 
 export const updateSessionResponseOneOneCaseBookIdMax = 2147483647;
 
@@ -839,6 +869,8 @@ export const updateSessionResponseTwoSectionScoresItemOneToImproveMax = 4000;
 
 
 export const UpdateSessionResponse = zod.object({
+  "case_book_publication_year": zod.number().int().min(updateSessionResponseOneOneCaseBookPublicationYearMin).nullable().describe('Optional typed edition year, at most next calendar year. Blank/omitted/null means unknown. A visible chosen book ID supplies the name; the server resolves shared edition, then owned edition, then creates an owned edition.'),
+  "case_style": zod.union([zod.literal('interviewer_led'),zod.literal('candidate_led'),zod.literal('not_sure'),zod.literal(null)]).nullish(),
   "case_book_id": zod.number().int().min(1).max(updateSessionResponseOneOneCaseBookIdMax).nullable().describe('Optional shared or owned case book. Omitted/null clears the link; behavioral sessions always clear it.'),
   "story_id": zod.number().int().min(1).max(updateSessionResponseOneOneStoryIdMax).nullable().describe('Optional owned story for behavioral sessions. Omitted/null clears the link; a case session always clears it.'),
   "section_scores": zod.array(zod.object({
@@ -899,15 +931,14 @@ export const GetCaseBooksResponse = zod.object({
 })
 
 
-export const createCaseBookBodyPublicationYearMin = 1000;
-export const createCaseBookBodyPublicationYearMax = 9999;
+export const createCaseBookBodyPublicationYearMin = 1990;
 
 export const createCaseBookBodyNameMax = 60;
 
 
 
 export const CreateCaseBookBody = zod.object({
-  "publication_year": zod.number().int().min(createCaseBookBodyPublicationYearMin).max(createCaseBookBodyPublicationYearMax).nullish(),
+  "publication_year": zod.number().int().min(createCaseBookBodyPublicationYearMin).nullish().describe('Optional whole year, no later than next calendar year. The session form\'s inline add sends only a name.'),
   "name": zod.string().max(createCaseBookBodyNameMax)
 })
 
