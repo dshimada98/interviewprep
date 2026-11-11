@@ -12,6 +12,7 @@ import { practiceSessions } from './practice-sessions.mjs';
 import { getDashboard } from './dashboard.mjs';
 import { stories } from './stories.mjs';
 import { caseBooks } from './case-books.mjs';
+import { rubric } from './rubric.mjs';
 import { checklist } from './checklist.mjs';
 import { downloadExport } from './export.mjs';
 
@@ -140,6 +141,7 @@ export async function requireAuth(req, res, next) {
 app.use('/api', requireAuth);
 app.use('/api/stories', stories);
 app.use('/api/case-books', caseBooks);
+app.use('/api/rubric', rubric);
 app.get('/api/dashboard', async (req, res) => {
   res.json(await getDashboard(req.user.id, undefined, req.query.range === 'all' ? 'all' : 'last10'));
 });

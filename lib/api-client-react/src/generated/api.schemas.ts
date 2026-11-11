@@ -346,10 +346,7 @@ export interface SessionInput {
      * @nullable
      */
   story_id?: number | null;
-  /**
-     * Scored sections only; omit N/A sections. Empty or omitted replaces all scores with none. Nonempty scores are rejected for behavioral sessions. Sections must exist and cannot repeat.
-     * @maxItems 7
-     */
+  /** Scored sections only; omit N/A sections. Empty or omitted replaces all scores with none. Nonempty scores are rejected for behavioral sessions. Sections must exist and cannot repeat. */
   section_scores?: SectionScoreInput[];
   /**
      * Required valid calendar date, not in the future.
@@ -423,7 +420,54 @@ export interface SessionList {
   total: number;
 }
 
+export type ScoreLevelName = typeof ScoreLevelName[keyof typeof ScoreLevelName];
+
+
+export const ScoreLevelName = {
+  Needs_rescue: 'Needs rescue',
+  Below_bar: 'Below bar',
+  At_bar: 'At bar',
+  Strong: 'Strong',
+  'Offer-level': 'Offer-level',
+} as const;
+
+export interface RubricEntry {
+  /**
+     * @minimum 1
+     * @maximum 5
+     */
+  score: number;
+  level_name: ScoreLevelName;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  description: string;
+  edited: boolean;
+}
+
+export interface RubricScope {
+  /** Case section ID, or behavioral_overall */
+  scope: string;
+  name: string;
+  subtitle: string;
+  entries: RubricEntry[];
+}
+
+export interface Rubric {
+  scopes: RubricScope[];
+}
+
+export interface RubricEdit {
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  description: string;
+}
+
 export interface CaseSection {
+  subtitle: string;
   id: number;
   name: string;
   display_order: number;

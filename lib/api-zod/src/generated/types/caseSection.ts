@@ -7,6 +7,7 @@
  */
 
 export interface CaseSection {
+  subtitle: string;
   id: number;
   name: string;
   display_order: number;

@@ -214,7 +214,7 @@ describe('practice-session data isolation', () => {
     });
     await request(app).get('/api/export.xlsx').expect(401);
     const empty = await download(b);
-    expect(empty.worksheets.map(s => s.name)).toEqual(['Summary', 'Cases', 'Section notes', 'Behavioral', 'Stories']);
+    expect(empty.worksheets.map(s => s.name)).toEqual(['Summary', 'Cases', 'Section notes', 'Behavioral', 'Stories', 'Rubric']);
     expect(allText(empty)).toContain('No sessions logged yet.');
     const types = (await a.agent.get('/api/question-types').expect(200)).body;
     const sections = (await a.agent.get('/api/case-sections').expect(200)).body;
@@ -255,7 +255,7 @@ describe('practice-session data isolation', () => {
     expect(strings).toContain('+SUM(A1:A2)');
     const cases = exported.getWorksheet('Cases')!;
     expect(cases.getRow(1).values).toEqual([undefined, 'Date', 'Case book', 'Interview style', 'Case type', 'Prompt', 'Format', 'Overall score',
-      'Introduction', 'Framework', 'Exhibits', 'Math', 'Brainstorm', 'Recommendation', 'Driving the case forward',
+      ...sections.map((s: { name: string }) => s.name),
       'What went well', 'What to improve', 'Starred']);
     expect(cases.rowCount).toBe(3);
     expect(cases.getCell('E2').value).toBe('+Unfiltered newest case');
@@ -263,7 +263,7 @@ describe('practice-session data isolation', () => {
     expect(cases.getCell('C3').value).toBe('Interviewer-led');
     expect(cases.getCell('B2').value).toBe('No book / live case');
     expect(cases.getCell('B3').value).toBe('Export casebook (2025)');
-    expect(cases.getCell('Q3').value).toBe('Yes');
+    expect(cases.getRow(3).getCell(cases.columnCount).value).toBe('Yes');
     expect(cases.getCell('K3').value).toBeNull();
     expect(cases.getCell('A3').value).toBeInstanceOf(Date);
     expect((cases.getCell('A3').value as Date).toISOString().slice(0, 10)).toBe('2025-10-28');
@@ -289,7 +289,7 @@ describe('practice-session data isolation', () => {
     expect(metric('Average case score')).toBe(dashboard.average_case_score);
     expect(metric('Weakest case type')).toBe(dashboard.weakest_case_type.name);
     expect(metric('Behavioral sessions')).toBe(dashboard.behavioral_sessions);
-    expect(summaryRows.filter(row => row[1] === 'Section averages')).toHaveLength(7);
+    expect(summaryRows.filter(row => row[1] === 'Section averages')).toHaveLength(sections.length);
     expect(summaryRows.filter(row => row[1] === 'Strongest sections').map(row => row[2]))
       .toEqual([sections[2].name, sections[1].name]);
     expect(summaryRows.filter(row => row[1] === 'Focus areas').map(row => row[5]))

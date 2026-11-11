@@ -1,9 +1,9 @@
 # InterviewPrep database schema — Features 1–13
 
 The application's SQL source of truth is
-`artifacts/interviewprep/server/schema.sql`. There are nine product tables
+`artifacts/interviewprep/server/schema.sql`. There are ten product tables
 (`users`, `question_types`, `practice_sessions`, `case_sections`, and
-`section_scores`, `stars`, `stories`, `case_books`, and `checklist_items`) plus the existing technical `login_sessions` table used for
+`section_scores`, `stars`, `stories`, `case_books`, `checklist_items`, and `rubric_entries`) plus the existing technical `login_sessions` table used for
 authentication. Behavioral practice sessions may optionally link to an owned story.
 
 ## users
@@ -473,7 +473,7 @@ deferred to Feature 5.
 | display_order | integer | Required; determines scorecard order |
 
 Startup inserts only missing names in both development and production, preserving
-existing rows and IDs. The seven initial rows are:
+existing rows and IDs. The eight shared rows are:
 
 1. Introduction
 2. Framework
@@ -482,9 +482,13 @@ existing rows and IDs. The seven initial rows are:
 5. Brainstorm
 6. Recommendation
 7. Driving the case forward
+8. Delivery
 
 `GET /api/case-sections` requires login and returns `id`, `name`, and
-`display_order`, sorted by `display_order`. These rows are shared by all users.
+`display_order` plus the skill `subtitle`, sorted by `display_order`. These rows
+are shared by all users. Adding Delivery does not create or backfill any
+`section_scores`: old sessions display it as N/A. Section lists and Excel Cases
+columns are read from this table, not a fixed list.
 
 ### section_scores — private through the parent session
 
@@ -539,7 +543,7 @@ GET `/api/sessions/:id`, POST, and PUT return `section_scores`, sorted by sectio
 `section_name`, and `display_order`. The detail read uses one ownership-scoped
 SQL statement for a consistent snapshot. The list remains a lightweight summary.
 
-The form shows the seven-row scorecard only for Case sessions. Notes expand on
+The form shows the table-driven scorecard only for Case sessions. Notes expand on
 request and start expanded when editing a section with saved notes. Detail
 shows a desktop table or phone cards, including gray N/A sections. Scores and
 notes use the same Save action as the session, not separate requests.
@@ -680,3 +684,38 @@ Session list/detail responses include current `story_id` and `story_title`.
 The database's `ON DELETE SET NULL` preserves practice sessions, overall scores
 and stars when a story is removed. Deleting a user cascades owned stories as well
 as their existing practice data.
+
+## rubric_entries — shared defaults and private overrides
+
+| Column | PostgreSQL type | Rules |
+| --- | --- | --- |
+| id | integer (`SERIAL`) | Primary key |
+| scope | text | Existing `case_sections.id` as text, or `behavioral_overall`; checked by a database trigger |
+| score | integer | Required, 1–5 |
+| description | text | Required, nonblank, at most 200 characters |
+| user_id | integer, nullable | Null for shared defaults; otherwise owner FK to `users.id`, `ON DELETE CASCADE` |
+
+`UNIQUE NULLS NOT DISTINCT (scope, score, user_id)` prevents duplicate defaults
+as well as duplicate private overrides. Startup seeds the five supplied
+descriptions for each of the eight case sections and behavioral overall,
+inserting only missing defaults. Apply the updated `schema.sql` before startup;
+startup performs reference-data seeding, not schema changes.
+
+Authenticated `GET /api/rubric` returns every scope with its subtitle and five
+levels: **Needs rescue**, **Below bar**, **At bar**, **Strong**, and **Offer-level**.
+Each entry prefers the signed-in user's description over the shared default,
+and includes `edited: true` only for that user's override. No other user's
+overrides are considered.
+
+`PUT /api/rubric/:scope/:score` accepts `{ description }` and saves only a private
+override owned by the signed-in user. Blank input returns
+`Please describe what this score means.`; overlong input returns
+`Please keep it under 200 characters.` in `errors.description`.
+`DELETE /api/rubric/:scope` resets only that user's edits for that scope, leaving
+other users, shared defaults, other sections, and historical scores untouched.
+Both writes require the existing CSRF protection.
+
+The Rubric page and scorecard help use this effective rubric. Excel's Rubric
+sheet uses the same authenticated user's definitions within the export snapshot.
+`tests/rubric.test.ts` covers defaults, level names, idempotent seeding, private
+edits and resets, validation and CSRF, Delivery/N/A dashboard behavior, and export.

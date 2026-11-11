@@ -209,6 +209,73 @@ paths:
                   $ref: "#/components/schemas/CaseSection"
         "401":
           description: Login required
+  /rubric:
+    get:
+      operationId: getRubric
+      summary: Current rubric, preferring the signed-in user's private edits
+      security: [{sessionCookie: []}]
+      responses:
+        "200":
+          description: All case sections and the behavioral overall rubric
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Rubric"
+        "401":
+          description: Login required
+  /rubric/{scope}/{score}:
+    put:
+      operationId: updateRubricEntry
+      security: [{sessionCookie: []}]
+      parameters:
+        - in: path
+          name: scope
+          required: true
+          schema: { type: string }
+          description: Case section ID as text, or behavioral_overall
+        - in: path
+          name: score
+          required: true
+          schema: { type: integer, minimum: 1, maximum: 5 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RubricEdit"
+      responses:
+        "200":
+          description: Saved private rubric entry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RubricEntry"
+        "400":
+          description: Invalid description
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionValidationError"
+        "401":
+          description: Login required
+        "404":
+          description: Unknown scope or score
+  /rubric/{scope}:
+    delete:
+      operationId: resetRubricScope
+      security: [{sessionCookie: []}]
+      parameters:
+        - in: path
+          name: scope
+          required: true
+          schema: { type: string }
+      responses:
+        "204":
+          description: Only this user's edits to the scope were removed
+        "401":
+          description: Login required
+        "404":
+          description: Unknown scope
   /sessions:
     get:
       operationId: listSessions
@@ -823,10 +890,53 @@ components:
         total:
           type: integer
           description: Total number of sessions owned by this user, before search or filters.
+    ScoreLevelName:
+      type: string
+      enum: [Needs rescue, Below bar, At bar, Strong, Offer-level]
+    RubricEntry:
+      type: object
+      required: [score, level_name, description, edited]
+      properties:
+        score: { type: integer, minimum: 1, maximum: 5 }
+        level_name:
+          $ref: "#/components/schemas/ScoreLevelName"
+        description: { type: string, minLength: 1, maxLength: 200 }
+        edited: { type: boolean }
+    RubricScope:
+      type: object
+      required: [scope, name, subtitle, entries]
+      properties:
+        scope:
+          type: string
+          description: Case section ID, or behavioral_overall
+        name: { type: string }
+        subtitle: { type: string }
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/RubricEntry"
+    Rubric:
+      type: object
+      required: [scopes]
+      properties:
+        scopes:
+          type: array
+          items:
+            $ref: "#/components/schemas/RubricScope"
+    RubricEdit:
+      type: object
+      required: [description]
+      properties:
+        description:
+          type: string
+          minLength: 1
+          maxLength: 200
     CaseSection:
       type: object
-      required: [id, name, display_order]
+      required: [id, name, display_order, subtitle]
       properties:
+        subtitle:
+          type: string
         id:
           type: integer
         name:
@@ -914,7 +1024,6 @@ components:
         section_scores:
           description: Scored sections only; omit N/A sections. Empty or omitted replaces all scores with none. Nonempty scores are rejected for behavioral sessions. Sections must exist and cannot repeat.
           type: array
-          maxItems: 7
           items:
             $ref: "#/components/schemas/SectionScoreInput"
         session_date:

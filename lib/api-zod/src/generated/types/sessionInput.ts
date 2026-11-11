@@ -31,10 +31,7 @@ export interface SessionInput {
      * @nullable
      */
   story_id?: number | null;
-  /**
-     * Scored sections only; omit N/A sections. Empty or omitted replaces all scores with none. Nonempty scores are rejected for behavioral sessions. Sections must exist and cannot repeat.
-     * @maxItems 7
-     */
+  /** Scored sections only; omit N/A sections. Empty or omitted replaces all scores with none. Nonempty scores are rejected for behavioral sessions. Sections must exist and cannot repeat. */
   section_scores?: SectionScoreInput[];
   /**
      * Required valid calendar date, not in the future.

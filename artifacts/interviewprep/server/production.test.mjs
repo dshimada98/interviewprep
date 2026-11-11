@@ -15,6 +15,7 @@ if (process.env.PRODUCTION_TEST_CHILD === '1') {
   const { pool } = await import('./db.mjs');
   const { seedQuestionTypes, questionTypeSeeds } = await import('./question-types.mjs');
   const { seedCaseSections, caseSectionSeeds } = await import('./case-sections.mjs');
+  const { seedRubric } = await import('./rubric.mjs');
   const { seedCaseBooks } = await import('./case-books.mjs');
   test('fresh provisioned schema: production signup, refresh, logout and login', async () => {
     const https = req => req.set('X-Forwarded-Proto', 'https');
@@ -31,6 +32,7 @@ if (process.env.PRODUCTION_TEST_CHILD === '1') {
       [legacyOwner.id, legacyType.id])).rows[0];
       await seedQuestionTypes();
       await seedCaseSections();
+      await seedRubric();
       const caseSeeded = (await pool.query('SELECT id, name, display_order FROM case_sections ORDER BY display_order')).rows;
       await Promise.all([seedCaseSections(), seedCaseSections()]);
       assert.deepEqual((await pool.query('SELECT id, name, display_order FROM case_sections ORDER BY display_order')).rows, caseSeeded);
@@ -82,6 +84,10 @@ if (process.env.PRODUCTION_TEST_CHILD === '1') {
       const sections = await https(request(app).get('/api/case-sections'))
         .set('Cookie', signedCookie.split(';')[0]).expect(200);
       assert.deepEqual(sections.body.map(row => row.name), caseSectionSeeds);
+      const rubric = (await https(request(app).get('/api/rubric'))
+        .set('Cookie', signedCookie.split(';')[0]).expect(200)).body;
+      assert.equal(rubric.scopes.length, sections.body.length + 1);
+      assert.ok(rubric.scopes.every(s => s.entries.length === 5 && s.entries.every(e => !e.edited)));
       const logout = await https(request(app).post('/api/auth/logout'))
         .set('Cookie', signedCookie.split(';')[0]).set('X-CSRF-Token', refresh.body.csrfToken)
         .send({}).expect(200);

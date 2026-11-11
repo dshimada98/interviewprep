@@ -44,7 +44,7 @@ const input = z.object({
     score: integer(1, 5, messages.section),
     went_well: notes,
     to_improve: notes,
-  }), { error: messages.section }).max(7, messages.section).refine(
+  }), { error: messages.section }).refine(
     scores => new Set(scores.map(row => row.section_id)).size === scores.length,
     messages.section,
   ).optional().default([]),

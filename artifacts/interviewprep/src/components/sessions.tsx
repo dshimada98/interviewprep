@@ -31,7 +31,8 @@ const FORMATS = [
   { v: 'partner', label: 'Partner' },
   { v: 'mock', label: 'Mock' },
 ] as const;
-const SCORE_LABEL = ['', 'Struggled', 'Shaky', 'Solid', 'Strong', 'Excellent'];
+import { LEVEL_NAMES as SCORE_LABEL, BEHAVIORAL_SCOPE } from './score-levels';
+import { RubricHelp, SelectedLevel } from './rubric-help';
 const MAX_INT = 2147483647;
 
 
@@ -672,6 +673,7 @@ function SessionForm({ initial, submitLabel, busy, onSubmit, cancelHref, serverE
 
       <fieldset className="space-y-2" aria-describedby={errs.overall_score ? 'score-err' : undefined}>
         <legend className="text-sm font-semibold">Overall score</legend>
+        {activeKind === 'behavioral' && <div className="flex items-center gap-1 text-xs text-muted-foreground" data-testid="text-behavioral-rubric"><span>Behavioral (overall) rubric</span><RubricHelp scope={BEHAVIORAL_SCOPE} name="Behavioral (overall)" /></div>}
         <div className="grid grid-cols-5 gap-2">
           {[1, 2, 3, 4, 5].map(n => {
             const on = v.overall_score === String(n);
@@ -686,6 +688,7 @@ function SessionForm({ initial, submitLabel, busy, onSubmit, cancelHref, serverE
             );
           })}
         </div>
+        {activeKind === 'behavioral' && <SelectedLevel scope={BEHAVIORAL_SCOPE} score={Number(v.overall_score) || null} testid="text-overall-level" />}
         {errs.overall_score && <ErrText id="score-err">{errs.overall_score}</ErrText>}
       </fieldset>
 

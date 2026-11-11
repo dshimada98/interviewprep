@@ -185,12 +185,12 @@ describe('private dashboard', () => {
     expect(data.cases_by_type).toHaveLength(caseTypes.length);
     expect(data.cases_by_type.every((t: { count: number }) => t.count === 0)).toBe(true);
     expect(data.section_averages).toEqual(sections.map(s => ({
-      ...s, average_score: null, scored_count: 0,
+      id: s.id, name: s.name, display_order: s.display_order, average_score: null, scored_count: 0,
     })));
     expect(data.heatmap).toEqual([]);
     expect(data.section_progress.cases).toEqual([]);
     expect(data.section_progress.weeks).toEqual([]);
-    expect(data.section_progress.sections).toHaveLength(7);
+    expect(data.section_progress.sections).toHaveLength(sections.length);
     expect(data.section_progress.sections.every((s: { recent_avg: number | null; change: number | null; times_scored: number }) =>
       s.recent_avg === null && s.change === null && s.times_scored === 0)).toBe(true);
   });
@@ -286,7 +286,7 @@ describe('private dashboard', () => {
     expect(data.heatmap).toHaveLength(10);
     expect(data.heatmap.slice(1).map((s: { id: number }) => s.id)).toEqual(added);
     expect(data.heatmap.some((s: { id: number }) => initialIds.includes(s.id))).toBe(false);
-    expect(data.heatmap.every((s: { sections: unknown[] }) => s.sections.length === 7)).toBe(true);
+    expect(data.heatmap.every((s: { sections: unknown[] }) => s.sections.length === sections.length)).toBe(true);
     expect(data.heatmap.every((s: { prompt: string }) => s.prompt === 'Dashboard test case')).toBe(true);
   });
 });

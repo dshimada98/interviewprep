@@ -122,6 +122,27 @@ CREATE TABLE IF NOT EXISTS case_sections (
   display_order INTEGER NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS rubric_entries (
+  id SERIAL PRIMARY KEY,
+  scope TEXT NOT NULL CHECK (scope = 'behavioral_overall' OR scope ~ '^[1-9][0-9]{0,9}$'),
+  score INTEGER NOT NULL CHECK (score BETWEEN 1 AND 5),
+  description TEXT NOT NULL CHECK (description ~ '[^[:space:]]' AND length(description) <= 200),
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  UNIQUE NULLS NOT DISTINCT (scope, score, user_id)
+);
+CREATE INDEX IF NOT EXISTS rubric_entries_user_scope_idx ON rubric_entries (user_id, scope);
+CREATE OR REPLACE FUNCTION check_rubric_scope() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF NEW.scope <> 'behavioral_overall'
+    AND NOT EXISTS (SELECT 1 FROM case_sections WHERE id::text=NEW.scope) THEN
+    RAISE EXCEPTION 'Unknown rubric section' USING ERRCODE = '23503';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+CREATE OR REPLACE TRIGGER rubric_entries_scope_check BEFORE INSERT OR UPDATE ON rubric_entries
+  FOR EACH ROW EXECUTE FUNCTION check_rubric_scope();
+
 CREATE TABLE IF NOT EXISTS section_scores (
   id SERIAL PRIMARY KEY,
   session_id INTEGER NOT NULL REFERENCES practice_sessions(id) ON DELETE CASCADE,

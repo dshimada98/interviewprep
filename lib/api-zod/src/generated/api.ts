@@ -446,11 +446,74 @@ export const GetDashboardResponse = zod.object({
  * @summary List shared case sections in scorecard order
  */
 export const GetCaseSectionsResponseItem = zod.object({
+  "subtitle": zod.string(),
   "id": zod.number().int(),
   "name": zod.string(),
   "display_order": zod.number().int()
 })
 export const GetCaseSectionsResponse = zod.array(GetCaseSectionsResponseItem)
+
+
+/**
+ * @summary Current rubric, preferring the signed-in user's private edits
+ */
+export const getRubricResponseScopesItemEntriesItemScoreMax = 5;
+
+export const getRubricResponseScopesItemEntriesItemDescriptionMax = 200;
+
+
+
+export const GetRubricResponse = zod.object({
+  "scopes": zod.array(zod.object({
+  "scope": zod.string().describe('Case section ID, or behavioral_overall'),
+  "name": zod.string(),
+  "subtitle": zod.string(),
+  "entries": zod.array(zod.object({
+  "score": zod.number().int().min(1).max(getRubricResponseScopesItemEntriesItemScoreMax),
+  "level_name": zod.enum(['Needs rescue', 'Below bar', 'At bar', 'Strong', 'Offer-level']),
+  "description": zod.string().min(1).max(getRubricResponseScopesItemEntriesItemDescriptionMax),
+  "edited": zod.boolean()
+}))
+}))
+})
+
+
+export const updateRubricEntryPathScoreMax = 5;
+
+
+
+export const UpdateRubricEntryParams = zod.object({
+  "scope": zod.coerce.string().describe('Case section ID as text, or behavioral_overall'),
+  "score": zod.coerce.number().int().min(1).max(updateRubricEntryPathScoreMax)
+})
+
+export const updateRubricEntryBodyDescriptionMax = 200;
+
+
+
+export const UpdateRubricEntryBody = zod.object({
+  "description": zod.string().min(1).max(updateRubricEntryBodyDescriptionMax)
+})
+
+export const updateRubricEntryResponseScoreMax = 5;
+
+export const updateRubricEntryResponseDescriptionMax = 200;
+
+
+
+export const UpdateRubricEntryResponse = zod.object({
+  "score": zod.number().int().min(1).max(updateRubricEntryResponseScoreMax),
+  "level_name": zod.enum(['Needs rescue', 'Below bar', 'At bar', 'Strong', 'Offer-level']),
+  "description": zod.string().min(1).max(updateRubricEntryResponseDescriptionMax),
+  "edited": zod.boolean()
+})
+
+
+export const ResetRubricScopeParams = zod.object({
+  "scope": zod.coerce.string()
+})
+
+export const ResetRubricScopeResponse = zod.void()
 
 
 export const ListSessionsQueryParams = zod.object({
@@ -478,8 +541,6 @@ export const listSessionsResponseSessionsItemOneSectionScoresItemWentWellMax = 4
 
 export const listSessionsResponseSessionsItemOneSectionScoresItemToImproveMax = 4000;
 
-export const listSessionsResponseSessionsItemOneSectionScoresMax = 7;
-
 export const listSessionsResponseSessionsItemOneSessionDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
 export const listSessionsResponseSessionsItemOneQuestionTypeIdMax = 2147483647;
 
@@ -506,7 +567,7 @@ export const ListSessionsResponse = zod.object({
   "score": zod.number().int().min(1).max(listSessionsResponseSessionsItemOneSectionScoresItemScoreMax),
   "went_well": zod.string().max(listSessionsResponseSessionsItemOneSectionScoresItemWentWellMax).nullish(),
   "to_improve": zod.string().max(listSessionsResponseSessionsItemOneSectionScoresItemToImproveMax).nullish()
-})).max(listSessionsResponseSessionsItemOneSectionScoresMax).optional().describe('Scored sections only; omit N/A sections. Empty or omitted replaces all scores with none. Nonempty scores are rejected for behavioral sessions. Sections must exist and cannot repeat.'),
+})).optional().describe('Scored sections only; omit N/A sections. Empty or omitted replaces all scores with none. Nonempty scores are rejected for behavioral sessions. Sections must exist and cannot repeat.'),
   "session_date": zod.string().regex(listSessionsResponseSessionsItemOneSessionDateRegExp).describe('Required valid calendar date, not in the future.'),
   "question_type_id": zod.number().int().min(1).max(listSessionsResponseSessionsItemOneQuestionTypeIdMax),
   "prompt": zod.string().min(1).max(listSessionsResponseSessionsItemOnePromptMax).describe('Trimmed before validation; whitespace-only prompts are rejected.'),
@@ -545,8 +606,6 @@ export const createSessionBodySectionScoresItemWentWellMax = 4000;
 
 export const createSessionBodySectionScoresItemToImproveMax = 4000;
 
-export const createSessionBodySectionScoresMax = 7;
-
 export const createSessionBodySessionDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
 export const createSessionBodyQuestionTypeIdMax = 2147483647;
 
@@ -572,7 +631,7 @@ export const CreateSessionBody = zod.object({
   "score": zod.number().int().min(1).max(createSessionBodySectionScoresItemScoreMax),
   "went_well": zod.string().max(createSessionBodySectionScoresItemWentWellMax).nullish(),
   "to_improve": zod.string().max(createSessionBodySectionScoresItemToImproveMax).nullish()
-})).max(createSessionBodySectionScoresMax).optional().describe('Scored sections only; omit N/A sections. Empty or omitted replaces all scores with none. Nonempty scores are rejected for behavioral sessions. Sections must exist and cannot repeat.'),
+})).optional().describe('Scored sections only; omit N/A sections. Empty or omitted replaces all scores with none. Nonempty scores are rejected for behavioral sessions. Sections must exist and cannot repeat.'),
   "session_date": zod.string().regex(createSessionBodySessionDateRegExp).describe('Required valid calendar date, not in the future.'),
   "question_type_id": zod.number().int().min(1).max(createSessionBodyQuestionTypeIdMax),
   "prompt": zod.string().min(1).max(createSessionBodyPromptMax).describe('Trimmed before validation; whitespace-only prompts are rejected.'),
@@ -596,8 +655,6 @@ export const createSessionResponseOneOneSectionScoresItemScoreMax = 5;
 export const createSessionResponseOneOneSectionScoresItemWentWellMax = 4000;
 
 export const createSessionResponseOneOneSectionScoresItemToImproveMax = 4000;
-
-export const createSessionResponseOneOneSectionScoresMax = 7;
 
 export const createSessionResponseOneOneSessionDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
 export const createSessionResponseOneOneQuestionTypeIdMax = 2147483647;
@@ -632,7 +689,7 @@ export const CreateSessionResponse = zod.object({
   "score": zod.number().int().min(1).max(createSessionResponseOneOneSectionScoresItemScoreMax),
   "went_well": zod.string().max(createSessionResponseOneOneSectionScoresItemWentWellMax).nullish(),
   "to_improve": zod.string().max(createSessionResponseOneOneSectionScoresItemToImproveMax).nullish()
-})).max(createSessionResponseOneOneSectionScoresMax).optional().describe('Scored sections only; omit N/A sections. Empty or omitted replaces all scores with none. Nonempty scores are rejected for behavioral sessions. Sections must exist and cannot repeat.'),
+})).optional().describe('Scored sections only; omit N/A sections. Empty or omitted replaces all scores with none. Nonempty scores are rejected for behavioral sessions. Sections must exist and cannot repeat.'),
   "session_date": zod.string().regex(createSessionResponseOneOneSessionDateRegExp).describe('Required valid calendar date, not in the future.'),
   "question_type_id": zod.number().int().min(1).max(createSessionResponseOneOneQuestionTypeIdMax),
   "prompt": zod.string().min(1).max(createSessionResponseOneOnePromptMax).describe('Trimmed before validation; whitespace-only prompts are rejected.'),
@@ -704,8 +761,6 @@ export const getSessionResponseOneOneSectionScoresItemWentWellMax = 4000;
 
 export const getSessionResponseOneOneSectionScoresItemToImproveMax = 4000;
 
-export const getSessionResponseOneOneSectionScoresMax = 7;
-
 export const getSessionResponseOneOneSessionDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
 export const getSessionResponseOneOneQuestionTypeIdMax = 2147483647;
 
@@ -739,7 +794,7 @@ export const GetSessionResponse = zod.object({
   "score": zod.number().int().min(1).max(getSessionResponseOneOneSectionScoresItemScoreMax),
   "went_well": zod.string().max(getSessionResponseOneOneSectionScoresItemWentWellMax).nullish(),
   "to_improve": zod.string().max(getSessionResponseOneOneSectionScoresItemToImproveMax).nullish()
-})).max(getSessionResponseOneOneSectionScoresMax).optional().describe('Scored sections only; omit N/A sections. Empty or omitted replaces all scores with none. Nonempty scores are rejected for behavioral sessions. Sections must exist and cannot repeat.'),
+})).optional().describe('Scored sections only; omit N/A sections. Empty or omitted replaces all scores with none. Nonempty scores are rejected for behavioral sessions. Sections must exist and cannot repeat.'),
   "session_date": zod.string().regex(getSessionResponseOneOneSessionDateRegExp).describe('Required valid calendar date, not in the future.'),
   "question_type_id": zod.number().int().min(1).max(getSessionResponseOneOneQuestionTypeIdMax),
   "prompt": zod.string().min(1).max(getSessionResponseOneOnePromptMax).describe('Trimmed before validation; whitespace-only prompts are rejected.'),
@@ -791,8 +846,6 @@ export const updateSessionBodySectionScoresItemWentWellMax = 4000;
 
 export const updateSessionBodySectionScoresItemToImproveMax = 4000;
 
-export const updateSessionBodySectionScoresMax = 7;
-
 export const updateSessionBodySessionDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
 export const updateSessionBodyQuestionTypeIdMax = 2147483647;
 
@@ -818,7 +871,7 @@ export const UpdateSessionBody = zod.object({
   "score": zod.number().int().min(1).max(updateSessionBodySectionScoresItemScoreMax),
   "went_well": zod.string().max(updateSessionBodySectionScoresItemWentWellMax).nullish(),
   "to_improve": zod.string().max(updateSessionBodySectionScoresItemToImproveMax).nullish()
-})).max(updateSessionBodySectionScoresMax).optional().describe('Scored sections only; omit N/A sections. Empty or omitted replaces all scores with none. Nonempty scores are rejected for behavioral sessions. Sections must exist and cannot repeat.'),
+})).optional().describe('Scored sections only; omit N/A sections. Empty or omitted replaces all scores with none. Nonempty scores are rejected for behavioral sessions. Sections must exist and cannot repeat.'),
   "session_date": zod.string().regex(updateSessionBodySessionDateRegExp).describe('Required valid calendar date, not in the future.'),
   "question_type_id": zod.number().int().min(1).max(updateSessionBodyQuestionTypeIdMax),
   "prompt": zod.string().min(1).max(updateSessionBodyPromptMax).describe('Trimmed before validation; whitespace-only prompts are rejected.'),
@@ -842,8 +895,6 @@ export const updateSessionResponseOneOneSectionScoresItemScoreMax = 5;
 export const updateSessionResponseOneOneSectionScoresItemWentWellMax = 4000;
 
 export const updateSessionResponseOneOneSectionScoresItemToImproveMax = 4000;
-
-export const updateSessionResponseOneOneSectionScoresMax = 7;
 
 export const updateSessionResponseOneOneSessionDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
 export const updateSessionResponseOneOneQuestionTypeIdMax = 2147483647;
@@ -878,7 +929,7 @@ export const UpdateSessionResponse = zod.object({
   "score": zod.number().int().min(1).max(updateSessionResponseOneOneSectionScoresItemScoreMax),
   "went_well": zod.string().max(updateSessionResponseOneOneSectionScoresItemWentWellMax).nullish(),
   "to_improve": zod.string().max(updateSessionResponseOneOneSectionScoresItemToImproveMax).nullish()
-})).max(updateSessionResponseOneOneSectionScoresMax).optional().describe('Scored sections only; omit N/A sections. Empty or omitted replaces all scores with none. Nonempty scores are rejected for behavioral sessions. Sections must exist and cannot repeat.'),
+})).optional().describe('Scored sections only; omit N/A sections. Empty or omitted replaces all scores with none. Nonempty scores are rejected for behavioral sessions. Sections must exist and cannot repeat.'),
   "session_date": zod.string().regex(updateSessionResponseOneOneSessionDateRegExp).describe('Required valid calendar date, not in the future.'),
   "question_type_id": zod.number().int().min(1).max(updateSessionResponseOneOneQuestionTypeIdMax),
   "prompt": zod.string().min(1).max(updateSessionResponseOneOnePromptMax).describe('Trimmed before validation; whitespace-only prompts are rejected.'),
