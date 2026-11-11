@@ -8,8 +8,13 @@
 import type { ListSessionsKind } from './listSessionsKind';
 import type { ListSessionsScore } from './listSessionsScore';
 import type { ListSessionsSort } from './listSessionsSort';
+import type { ListSessionsStyle } from './listSessionsStyle';
 
 export type ListSessionsParams = {
+/**
+ * Case interview style; not_set selects case sessions without a style.
+ */
+style?: ListSessionsStyle;
 q?: string;
 kind?: ListSessionsKind;
 type?: number;

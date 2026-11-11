@@ -39,6 +39,9 @@ import type {
   PracticeSessionDetail,
   QuestionType,
   QuestionTypeInput,
+  Rubric,
+  RubricEdit,
+  RubricEntry,
   SessionInput,
   SessionList,
   SessionValidationError,
@@ -1059,6 +1062,236 @@ export function useGetCaseSections<TData = Awaited<ReturnType<typeof getCaseSect
 
 
 
+
+export const getGetRubricUrl = () => {
+
+
+
+
+  return `/api/rubric`
+}
+
+/**
+ * @summary Current rubric, preferring the signed-in user's private edits
+ */
+export const getRubric = async ( options?: Parameters<typeof customFetch>[1]): Promise<Rubric> => {
+
+  return customFetch<Rubric>(getGetRubricUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetRubricQueryKey = () => {
+    return [
+    `/api/rubric`
+    ] as const;
+    }
+
+
+export const getGetRubricQueryOptions = <TData = Awaited<ReturnType<typeof getRubric>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRubric>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetRubricQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getRubric>>> = ({ signal }) => getRubric({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getRubric>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetRubricQueryResult = NonNullable<Awaited<ReturnType<typeof getRubric>>>
+export type GetRubricQueryError = ErrorType<void>
+
+
+/**
+ * @summary Current rubric, preferring the signed-in user's private edits
+ */
+
+export function useGetRubric<TData = Awaited<ReturnType<typeof getRubric>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRubric>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetRubricQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdateRubricEntryUrl = (scope: string,
+    score: number,) => {
+
+
+
+
+  return `/api/rubric/${scope}/${score}`
+}
+
+export const updateRubricEntry = async (scope: string,
+    score: number,
+    rubricEdit: RubricEdit, options?: Parameters<typeof customFetch>[1]): Promise<RubricEntry> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<RubricEntry>(getUpdateRubricEntryUrl(scope,score),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(rubricEdit)
+  }
+);}
+
+
+
+
+
+export const getUpdateRubricEntryMutationKey = () => ['updateRubricEntry'] as const;
+
+export const getUpdateRubricEntryMutationOptions = <TError = ErrorType<SessionValidationError | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateRubricEntry>>, TError,UpdateRubricEntryMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateRubricEntry>>, TError,UpdateRubricEntryMutationVariables, TContext> => {
+
+const mutationKey = getUpdateRubricEntryMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateRubricEntry>>, UpdateRubricEntryMutationVariables> = (props) => {
+          const {scope,score,data} = props ?? {};
+
+          return  updateRubricEntry(scope,score,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateRubricEntryMutationResult = NonNullable<Awaited<ReturnType<typeof updateRubricEntry>>>
+    export type UpdateRubricEntryMutationBody = BodyType<RubricEdit>
+    export type UpdateRubricEntryMutationError = ErrorType<SessionValidationError | void>
+    export type UpdateRubricEntryMutationVariables = {scope: string;score: number;data: BodyType<RubricEdit>}
+
+    export const useUpdateRubricEntry = <TError = ErrorType<SessionValidationError | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateRubricEntry>>, TError,UpdateRubricEntryMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateRubricEntry>>,
+        TError,
+        UpdateRubricEntryMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateRubricEntryMutationOptions(options));
+    }
+
+export const getResetRubricScopeUrl = (scope: string,) => {
+
+
+
+
+  return `/api/rubric/${scope}`
+}
+
+export const resetRubricScope = async (scope: string, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getResetRubricScopeUrl(scope),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getResetRubricScopeMutationKey = () => ['resetRubricScope'] as const;
+
+export const getResetRubricScopeMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resetRubricScope>>, TError,ResetRubricScopeMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof resetRubricScope>>, TError,ResetRubricScopeMutationVariables, TContext> => {
+
+const mutationKey = getResetRubricScopeMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof resetRubricScope>>, ResetRubricScopeMutationVariables> = (props) => {
+          const {scope} = props ?? {};
+
+          return  resetRubricScope(scope,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ResetRubricScopeMutationResult = NonNullable<Awaited<ReturnType<typeof resetRubricScope>>>
+
+    export type ResetRubricScopeMutationError = ErrorType<void>
+    export type ResetRubricScopeMutationVariables = {scope: string}
+
+    export const useResetRubricScope = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resetRubricScope>>, TError,ResetRubricScopeMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof resetRubricScope>>,
+        TError,
+        ResetRubricScopeMutationVariables,
+        TContext
+      > => {
+      return useMutation(getResetRubricScopeMutationOptions(options));
+    }
 
 export const getListSessionsUrl = (params?: ListSessionsParams,) => {
   const normalizedParams = new URLSearchParams();

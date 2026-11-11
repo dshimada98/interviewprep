@@ -10,8 +10,11 @@ Live URL: myinterviewprep.replit.app
 
 - **Private accounts:** Sign up, log in, and log out; each account can access only its own practice data.
 - **Practice log:** Create, view, edit, and delete case and behavioral sessions with dates, prompts, formats, scores, and feedback.
-- **Case scorecards:** Score seven case sections individually, record what went well and what to improve, and leave unscored sections as N/A.
-- **Case books:** Organize cases by book and publication year, add private books, and review practice by book.
+- **Case scorecards:** Score eight skills including Delivery, see skill subtitles and rubric guidance, record what went well and what to improve, and leave unscored sections as N/A.
+- **Scoring rubric:** Calibrate scores from Needs rescue to Offer-level, consult scorecard help, and privately edit or reset descriptions for each case skill and behavioral overall score.
+- **Case books:** Choose a book name once, optionally type its edition year, and reuse or create a private edition automatically; add private names, including alongside shared books such as Booth Casebook, and review distinct editions by book.
+- **Case categories:** Practice shared case types including Private Equity and Wildcard.
+- **Interview styles:** Optionally log interviewer-led, candidate-led, or unsure cases; filter sessions, compare style averages and weakest sections, and export the style to Excel.
 - **Behavioral categories:** Use built-in question types or add private custom categories.
 - **STAR story bank:** Save stories by competency, link them to behavioral practice, and track practice counts and average scores.
 - **Dashboard:** Review practice totals and question-type breakdowns, plus a Section progress card with case/weekly trends, heatmaps, all-time averages, and recent-versus-earlier section comparisons.
@@ -19,7 +22,7 @@ Live URL: myinterviewprep.replit.app
 - **Improvement checklist:** Add or copy improvement notes, optionally tag a case section, and edit, complete, or clear checklist items.
 - **Stars:** Save important sessions for later review in a dedicated starred view.
 - **Session finder:** Search prompts and notes, combine filters, and sort practice sessions.
-- **Excel export:** Download all your data, regardless of page filters, in five sheets: Summary, Cases, Section notes, Behavioral, and Stories.
+- **Excel export:** Download all your data, regardless of page filters, in six sheets: Summary, Cases (including Delivery), Section notes, Behavioral, Stories, and your current Rubric.
 
 ## Tools used
 
@@ -58,7 +61,7 @@ Run commands from the repository root. This is a **pnpm workspace**: use pnpm to
    psql --dbname="$DATABASE_URL" -v ON_ERROR_STOP=1 -f artifacts/interviewprep/server/schema.sql
    ```
 
-   This command changes the database selected by `DATABASE_URL`. The server expects the schema to exist; it does not create or migrate tables at startup. See [schema.md](schema.md) for database structure and provisioning details.
+   This command changes the database selected by `DATABASE_URL`. For an existing database, apply the updated idempotent schema before starting this version as well: it adds the nullable `case_style` column and allows new shared seeds without relinking legacy private books. The server expects the schema to exist; it does not create or migrate tables at startup. See [schema.md](schema.md) for database structure and provisioning details.
 
 5. **Start InterviewPrep.**
 
@@ -68,7 +71,7 @@ Run commands from the repository root. This is a **pnpm workspace**: use pnpm to
 
    Express serves both the API and the React application. The default local address is `http://localhost:5000`; when the workspace supplies a different port, use its Preview instead.
 
-   **Question types, case sections, and case books seed automatically on startup**, before the server begins accepting requests. Seeding inserts missing shared reference data without duplicating existing entries; it requires a working database with the schema already provisioned.
+   **Question types, case sections, case books, and shared rubric defaults seed automatically on startup**, before the server begins accepting requests. Seeding inserts missing shared reference data without duplicating existing entries or replacing private rubric edits; it requires a working database with the updated schema already provisioned, including `rubric_entries`.
 
 6. **Open the app and create an account.** Sign up to begin logging practice. A new account starts with no practice sessions.
 
@@ -116,6 +119,7 @@ Paths in the next table are relative to the repository root.
 | `tests/dashboard.test.ts` | Dashboard calculations, section averages, heatmap data, recent cases, empty accounts, and user isolation. |
 | `tests/next-case-focus.test.ts` | Recent-case focus selection, N/A exclusion, tie-breaking, improvement notes, and privacy. |
 | `tests/stories.test.ts` | STAR story validation and CRUD, competency filtering, session links, practice statistics, and ownership. |
+| `tests/rubric.test.ts` | Shared rubric defaults and level names, private edits and resets, validation, Delivery/N/A dashboard data, and personalized Excel exports. |
 | `tests/data-isolation.test.ts` | Cross-user isolation for sessions, categories, books, checklist items, and Excel exports, plus workbook contents and formatting. |
 
 ### Optional browser test

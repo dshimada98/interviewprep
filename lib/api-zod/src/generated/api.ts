@@ -352,6 +352,13 @@ export const getDashboardResponseNextCaseFocusMax = 2;
 
 
 export const GetDashboardResponse = zod.object({
+  "by_case_style": zod.array(zod.object({
+  "case_style": zod.union([zod.literal('interviewer_led'),zod.literal('candidate_led'),zod.literal('not_sure'),zod.literal(null)]).nullable(),
+  "name": zod.string(),
+  "count": zod.number().int(),
+  "average_score": zod.number(),
+  "weakest_section": zod.string().nullable().describe('Lowest-average section scored at least twice within this style.')
+})),
   "section_progress": zod.object({
   "cases": zod.array(zod.object({
   "id": zod.number().int(),
@@ -439,6 +446,7 @@ export const GetDashboardResponse = zod.object({
  * @summary List shared case sections in scorecard order
  */
 export const GetCaseSectionsResponseItem = zod.object({
+  "subtitle": zod.string(),
   "id": zod.number().int(),
   "name": zod.string(),
   "display_order": zod.number().int()
@@ -446,7 +454,70 @@ export const GetCaseSectionsResponseItem = zod.object({
 export const GetCaseSectionsResponse = zod.array(GetCaseSectionsResponseItem)
 
 
+/**
+ * @summary Current rubric, preferring the signed-in user's private edits
+ */
+export const getRubricResponseScopesItemEntriesItemScoreMax = 5;
+
+export const getRubricResponseScopesItemEntriesItemDescriptionMax = 200;
+
+
+
+export const GetRubricResponse = zod.object({
+  "scopes": zod.array(zod.object({
+  "scope": zod.string().describe('Case section ID, or behavioral_overall'),
+  "name": zod.string(),
+  "subtitle": zod.string(),
+  "entries": zod.array(zod.object({
+  "score": zod.number().int().min(1).max(getRubricResponseScopesItemEntriesItemScoreMax),
+  "level_name": zod.enum(['Needs rescue', 'Below bar', 'At bar', 'Strong', 'Offer-level']),
+  "description": zod.string().min(1).max(getRubricResponseScopesItemEntriesItemDescriptionMax),
+  "edited": zod.boolean()
+}))
+}))
+})
+
+
+export const updateRubricEntryPathScoreMax = 5;
+
+
+
+export const UpdateRubricEntryParams = zod.object({
+  "scope": zod.coerce.string().describe('Case section ID as text, or behavioral_overall'),
+  "score": zod.coerce.number().int().min(1).max(updateRubricEntryPathScoreMax)
+})
+
+export const updateRubricEntryBodyDescriptionMax = 200;
+
+
+
+export const UpdateRubricEntryBody = zod.object({
+  "description": zod.string().min(1).max(updateRubricEntryBodyDescriptionMax)
+})
+
+export const updateRubricEntryResponseScoreMax = 5;
+
+export const updateRubricEntryResponseDescriptionMax = 200;
+
+
+
+export const UpdateRubricEntryResponse = zod.object({
+  "score": zod.number().int().min(1).max(updateRubricEntryResponseScoreMax),
+  "level_name": zod.enum(['Needs rescue', 'Below bar', 'At bar', 'Strong', 'Offer-level']),
+  "description": zod.string().min(1).max(updateRubricEntryResponseDescriptionMax),
+  "edited": zod.boolean()
+})
+
+
+export const ResetRubricScopeParams = zod.object({
+  "scope": zod.coerce.string()
+})
+
+export const ResetRubricScopeResponse = zod.void()
+
+
 export const ListSessionsQueryParams = zod.object({
+  "style": zod.enum(['interviewer_led', 'candidate_led', 'not_sure', 'not_set']).optional().describe('Case interview style; not_set selects case sessions without a style.'),
   "q": zod.coerce.string().optional(),
   "kind": zod.enum(['case', 'behavioral']).optional(),
   "type": zod.coerce.number().int().optional(),
@@ -455,6 +526,8 @@ export const ListSessionsQueryParams = zod.object({
   "sort": zod.enum(['newest', 'oldest', 'highest', 'lowest']).optional(),
   "starred": zod.coerce.boolean().optional().describe('When true, return only the current user\'s starred sessions.')
 })
+
+export const listSessionsResponseSessionsItemOneCaseBookPublicationYearMin = 1990;
 
 export const listSessionsResponseSessionsItemOneCaseBookIdMax = 2147483647;
 
@@ -467,8 +540,6 @@ export const listSessionsResponseSessionsItemOneSectionScoresItemScoreMax = 5;
 export const listSessionsResponseSessionsItemOneSectionScoresItemWentWellMax = 4000;
 
 export const listSessionsResponseSessionsItemOneSectionScoresItemToImproveMax = 4000;
-
-export const listSessionsResponseSessionsItemOneSectionScoresMax = 7;
 
 export const listSessionsResponseSessionsItemOneSessionDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
 export const listSessionsResponseSessionsItemOneQuestionTypeIdMax = 2147483647;
@@ -487,6 +558,8 @@ export const listSessionsResponseSessionsItemOneToImproveMax = 4000;
 
 export const ListSessionsResponse = zod.object({
   "sessions": zod.array(zod.object({
+  "case_book_publication_year": zod.number().int().min(listSessionsResponseSessionsItemOneCaseBookPublicationYearMin).nullable().describe('Optional typed edition year, at most next calendar year. Blank/omitted/null means unknown. A visible chosen book ID supplies the name; the server resolves shared edition, then owned edition, then creates an owned edition.'),
+  "case_style": zod.union([zod.literal('interviewer_led'),zod.literal('candidate_led'),zod.literal('not_sure'),zod.literal(null)]).nullish(),
   "case_book_id": zod.number().int().min(1).max(listSessionsResponseSessionsItemOneCaseBookIdMax).nullable().describe('Optional shared or owned case book. Omitted/null clears the link; behavioral sessions always clear it.'),
   "story_id": zod.number().int().min(1).max(listSessionsResponseSessionsItemOneStoryIdMax).nullable().describe('Optional owned story for behavioral sessions. Omitted/null clears the link; a case session always clears it.'),
   "section_scores": zod.array(zod.object({
@@ -494,7 +567,7 @@ export const ListSessionsResponse = zod.object({
   "score": zod.number().int().min(1).max(listSessionsResponseSessionsItemOneSectionScoresItemScoreMax),
   "went_well": zod.string().max(listSessionsResponseSessionsItemOneSectionScoresItemWentWellMax).nullish(),
   "to_improve": zod.string().max(listSessionsResponseSessionsItemOneSectionScoresItemToImproveMax).nullish()
-})).max(listSessionsResponseSessionsItemOneSectionScoresMax).optional().describe('Scored sections only; omit N/A sections. Empty or omitted replaces all scores with none. Nonempty scores are rejected for behavioral sessions. Sections must exist and cannot repeat.'),
+})).optional().describe('Scored sections only; omit N/A sections. Empty or omitted replaces all scores with none. Nonempty scores are rejected for behavioral sessions. Sections must exist and cannot repeat.'),
   "session_date": zod.string().regex(listSessionsResponseSessionsItemOneSessionDateRegExp).describe('Required valid calendar date, not in the future.'),
   "question_type_id": zod.number().int().min(1).max(listSessionsResponseSessionsItemOneQuestionTypeIdMax),
   "prompt": zod.string().min(1).max(listSessionsResponseSessionsItemOnePromptMax).describe('Trimmed before validation; whitespace-only prompts are rejected.'),
@@ -519,6 +592,8 @@ export const ListSessionsResponse = zod.object({
 })
 
 
+export const createSessionBodyCaseBookPublicationYearMin = 1990;
+
 export const createSessionBodyCaseBookIdMax = 2147483647;
 
 export const createSessionBodyStoryIdMax = 2147483647;
@@ -530,8 +605,6 @@ export const createSessionBodySectionScoresItemScoreMax = 5;
 export const createSessionBodySectionScoresItemWentWellMax = 4000;
 
 export const createSessionBodySectionScoresItemToImproveMax = 4000;
-
-export const createSessionBodySectionScoresMax = 7;
 
 export const createSessionBodySessionDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
 export const createSessionBodyQuestionTypeIdMax = 2147483647;
@@ -549,6 +622,8 @@ export const createSessionBodyToImproveMax = 4000;
 
 
 export const CreateSessionBody = zod.object({
+  "case_book_publication_year": zod.number().int().min(createSessionBodyCaseBookPublicationYearMin).nullish().describe('Optional typed edition year, at most next calendar year. Blank/omitted/null means unknown. A visible chosen book ID supplies the name; the server resolves shared edition, then owned edition, then creates an owned edition.'),
+  "case_style": zod.union([zod.literal('interviewer_led'),zod.literal('candidate_led'),zod.literal('not_sure'),zod.literal(null)]).nullish(),
   "case_book_id": zod.number().int().min(1).max(createSessionBodyCaseBookIdMax).nullish().describe('Optional shared or owned case book. Omitted/null clears the link; behavioral sessions always clear it.'),
   "story_id": zod.number().int().min(1).max(createSessionBodyStoryIdMax).nullish().describe('Optional owned story for behavioral sessions. Omitted/null clears the link; a case session always clears it.'),
   "section_scores": zod.array(zod.object({
@@ -556,7 +631,7 @@ export const CreateSessionBody = zod.object({
   "score": zod.number().int().min(1).max(createSessionBodySectionScoresItemScoreMax),
   "went_well": zod.string().max(createSessionBodySectionScoresItemWentWellMax).nullish(),
   "to_improve": zod.string().max(createSessionBodySectionScoresItemToImproveMax).nullish()
-})).max(createSessionBodySectionScoresMax).optional().describe('Scored sections only; omit N/A sections. Empty or omitted replaces all scores with none. Nonempty scores are rejected for behavioral sessions. Sections must exist and cannot repeat.'),
+})).optional().describe('Scored sections only; omit N/A sections. Empty or omitted replaces all scores with none. Nonempty scores are rejected for behavioral sessions. Sections must exist and cannot repeat.'),
   "session_date": zod.string().regex(createSessionBodySessionDateRegExp).describe('Required valid calendar date, not in the future.'),
   "question_type_id": zod.number().int().min(1).max(createSessionBodyQuestionTypeIdMax),
   "prompt": zod.string().min(1).max(createSessionBodyPromptMax).describe('Trimmed before validation; whitespace-only prompts are rejected.'),
@@ -566,6 +641,8 @@ export const CreateSessionBody = zod.object({
   "went_well": zod.string().max(createSessionBodyWentWellMax).nullish(),
   "to_improve": zod.string().max(createSessionBodyToImproveMax).nullish()
 })
+
+export const createSessionResponseOneOneCaseBookPublicationYearMin = 1990;
 
 export const createSessionResponseOneOneCaseBookIdMax = 2147483647;
 
@@ -578,8 +655,6 @@ export const createSessionResponseOneOneSectionScoresItemScoreMax = 5;
 export const createSessionResponseOneOneSectionScoresItemWentWellMax = 4000;
 
 export const createSessionResponseOneOneSectionScoresItemToImproveMax = 4000;
-
-export const createSessionResponseOneOneSectionScoresMax = 7;
 
 export const createSessionResponseOneOneSessionDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
 export const createSessionResponseOneOneQuestionTypeIdMax = 2147483647;
@@ -605,6 +680,8 @@ export const createSessionResponseTwoSectionScoresItemOneToImproveMax = 4000;
 
 
 export const CreateSessionResponse = zod.object({
+  "case_book_publication_year": zod.number().int().min(createSessionResponseOneOneCaseBookPublicationYearMin).nullable().describe('Optional typed edition year, at most next calendar year. Blank/omitted/null means unknown. A visible chosen book ID supplies the name; the server resolves shared edition, then owned edition, then creates an owned edition.'),
+  "case_style": zod.union([zod.literal('interviewer_led'),zod.literal('candidate_led'),zod.literal('not_sure'),zod.literal(null)]).nullish(),
   "case_book_id": zod.number().int().min(1).max(createSessionResponseOneOneCaseBookIdMax).nullable().describe('Optional shared or owned case book. Omitted/null clears the link; behavioral sessions always clear it.'),
   "story_id": zod.number().int().min(1).max(createSessionResponseOneOneStoryIdMax).nullable().describe('Optional owned story for behavioral sessions. Omitted/null clears the link; a case session always clears it.'),
   "section_scores": zod.array(zod.object({
@@ -612,7 +689,7 @@ export const CreateSessionResponse = zod.object({
   "score": zod.number().int().min(1).max(createSessionResponseOneOneSectionScoresItemScoreMax),
   "went_well": zod.string().max(createSessionResponseOneOneSectionScoresItemWentWellMax).nullish(),
   "to_improve": zod.string().max(createSessionResponseOneOneSectionScoresItemToImproveMax).nullish()
-})).max(createSessionResponseOneOneSectionScoresMax).optional().describe('Scored sections only; omit N/A sections. Empty or omitted replaces all scores with none. Nonempty scores are rejected for behavioral sessions. Sections must exist and cannot repeat.'),
+})).optional().describe('Scored sections only; omit N/A sections. Empty or omitted replaces all scores with none. Nonempty scores are rejected for behavioral sessions. Sections must exist and cannot repeat.'),
   "session_date": zod.string().regex(createSessionResponseOneOneSessionDateRegExp).describe('Required valid calendar date, not in the future.'),
   "question_type_id": zod.number().int().min(1).max(createSessionResponseOneOneQuestionTypeIdMax),
   "prompt": zod.string().min(1).max(createSessionResponseOneOnePromptMax).describe('Trimmed before validation; whitespace-only prompts are rejected.'),
@@ -670,6 +747,8 @@ export const GetSessionParams = zod.object({
   "id": zod.coerce.number().int()
 })
 
+export const getSessionResponseOneOneCaseBookPublicationYearMin = 1990;
+
 export const getSessionResponseOneOneCaseBookIdMax = 2147483647;
 
 export const getSessionResponseOneOneStoryIdMax = 2147483647;
@@ -681,8 +760,6 @@ export const getSessionResponseOneOneSectionScoresItemScoreMax = 5;
 export const getSessionResponseOneOneSectionScoresItemWentWellMax = 4000;
 
 export const getSessionResponseOneOneSectionScoresItemToImproveMax = 4000;
-
-export const getSessionResponseOneOneSectionScoresMax = 7;
 
 export const getSessionResponseOneOneSessionDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
 export const getSessionResponseOneOneQuestionTypeIdMax = 2147483647;
@@ -708,6 +785,8 @@ export const getSessionResponseTwoSectionScoresItemOneToImproveMax = 4000;
 
 
 export const GetSessionResponse = zod.object({
+  "case_book_publication_year": zod.number().int().min(getSessionResponseOneOneCaseBookPublicationYearMin).nullable().describe('Optional typed edition year, at most next calendar year. Blank/omitted/null means unknown. A visible chosen book ID supplies the name; the server resolves shared edition, then owned edition, then creates an owned edition.'),
+  "case_style": zod.union([zod.literal('interviewer_led'),zod.literal('candidate_led'),zod.literal('not_sure'),zod.literal(null)]).nullish(),
   "case_book_id": zod.number().int().min(1).max(getSessionResponseOneOneCaseBookIdMax).nullable().describe('Optional shared or owned case book. Omitted/null clears the link; behavioral sessions always clear it.'),
   "story_id": zod.number().int().min(1).max(getSessionResponseOneOneStoryIdMax).nullable().describe('Optional owned story for behavioral sessions. Omitted/null clears the link; a case session always clears it.'),
   "section_scores": zod.array(zod.object({
@@ -715,7 +794,7 @@ export const GetSessionResponse = zod.object({
   "score": zod.number().int().min(1).max(getSessionResponseOneOneSectionScoresItemScoreMax),
   "went_well": zod.string().max(getSessionResponseOneOneSectionScoresItemWentWellMax).nullish(),
   "to_improve": zod.string().max(getSessionResponseOneOneSectionScoresItemToImproveMax).nullish()
-})).max(getSessionResponseOneOneSectionScoresMax).optional().describe('Scored sections only; omit N/A sections. Empty or omitted replaces all scores with none. Nonempty scores are rejected for behavioral sessions. Sections must exist and cannot repeat.'),
+})).optional().describe('Scored sections only; omit N/A sections. Empty or omitted replaces all scores with none. Nonempty scores are rejected for behavioral sessions. Sections must exist and cannot repeat.'),
   "session_date": zod.string().regex(getSessionResponseOneOneSessionDateRegExp).describe('Required valid calendar date, not in the future.'),
   "question_type_id": zod.number().int().min(1).max(getSessionResponseOneOneQuestionTypeIdMax),
   "prompt": zod.string().min(1).max(getSessionResponseOneOnePromptMax).describe('Trimmed before validation; whitespace-only prompts are rejected.'),
@@ -753,6 +832,8 @@ export const UpdateSessionParams = zod.object({
   "id": zod.coerce.number().int()
 })
 
+export const updateSessionBodyCaseBookPublicationYearMin = 1990;
+
 export const updateSessionBodyCaseBookIdMax = 2147483647;
 
 export const updateSessionBodyStoryIdMax = 2147483647;
@@ -764,8 +845,6 @@ export const updateSessionBodySectionScoresItemScoreMax = 5;
 export const updateSessionBodySectionScoresItemWentWellMax = 4000;
 
 export const updateSessionBodySectionScoresItemToImproveMax = 4000;
-
-export const updateSessionBodySectionScoresMax = 7;
 
 export const updateSessionBodySessionDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
 export const updateSessionBodyQuestionTypeIdMax = 2147483647;
@@ -783,6 +862,8 @@ export const updateSessionBodyToImproveMax = 4000;
 
 
 export const UpdateSessionBody = zod.object({
+  "case_book_publication_year": zod.number().int().min(updateSessionBodyCaseBookPublicationYearMin).nullish().describe('Optional typed edition year, at most next calendar year. Blank/omitted/null means unknown. A visible chosen book ID supplies the name; the server resolves shared edition, then owned edition, then creates an owned edition.'),
+  "case_style": zod.union([zod.literal('interviewer_led'),zod.literal('candidate_led'),zod.literal('not_sure'),zod.literal(null)]).nullish(),
   "case_book_id": zod.number().int().min(1).max(updateSessionBodyCaseBookIdMax).nullish().describe('Optional shared or owned case book. Omitted/null clears the link; behavioral sessions always clear it.'),
   "story_id": zod.number().int().min(1).max(updateSessionBodyStoryIdMax).nullish().describe('Optional owned story for behavioral sessions. Omitted/null clears the link; a case session always clears it.'),
   "section_scores": zod.array(zod.object({
@@ -790,7 +871,7 @@ export const UpdateSessionBody = zod.object({
   "score": zod.number().int().min(1).max(updateSessionBodySectionScoresItemScoreMax),
   "went_well": zod.string().max(updateSessionBodySectionScoresItemWentWellMax).nullish(),
   "to_improve": zod.string().max(updateSessionBodySectionScoresItemToImproveMax).nullish()
-})).max(updateSessionBodySectionScoresMax).optional().describe('Scored sections only; omit N/A sections. Empty or omitted replaces all scores with none. Nonempty scores are rejected for behavioral sessions. Sections must exist and cannot repeat.'),
+})).optional().describe('Scored sections only; omit N/A sections. Empty or omitted replaces all scores with none. Nonempty scores are rejected for behavioral sessions. Sections must exist and cannot repeat.'),
   "session_date": zod.string().regex(updateSessionBodySessionDateRegExp).describe('Required valid calendar date, not in the future.'),
   "question_type_id": zod.number().int().min(1).max(updateSessionBodyQuestionTypeIdMax),
   "prompt": zod.string().min(1).max(updateSessionBodyPromptMax).describe('Trimmed before validation; whitespace-only prompts are rejected.'),
@@ -800,6 +881,8 @@ export const UpdateSessionBody = zod.object({
   "went_well": zod.string().max(updateSessionBodyWentWellMax).nullish(),
   "to_improve": zod.string().max(updateSessionBodyToImproveMax).nullish()
 })
+
+export const updateSessionResponseOneOneCaseBookPublicationYearMin = 1990;
 
 export const updateSessionResponseOneOneCaseBookIdMax = 2147483647;
 
@@ -812,8 +895,6 @@ export const updateSessionResponseOneOneSectionScoresItemScoreMax = 5;
 export const updateSessionResponseOneOneSectionScoresItemWentWellMax = 4000;
 
 export const updateSessionResponseOneOneSectionScoresItemToImproveMax = 4000;
-
-export const updateSessionResponseOneOneSectionScoresMax = 7;
 
 export const updateSessionResponseOneOneSessionDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
 export const updateSessionResponseOneOneQuestionTypeIdMax = 2147483647;
@@ -839,6 +920,8 @@ export const updateSessionResponseTwoSectionScoresItemOneToImproveMax = 4000;
 
 
 export const UpdateSessionResponse = zod.object({
+  "case_book_publication_year": zod.number().int().min(updateSessionResponseOneOneCaseBookPublicationYearMin).nullable().describe('Optional typed edition year, at most next calendar year. Blank/omitted/null means unknown. A visible chosen book ID supplies the name; the server resolves shared edition, then owned edition, then creates an owned edition.'),
+  "case_style": zod.union([zod.literal('interviewer_led'),zod.literal('candidate_led'),zod.literal('not_sure'),zod.literal(null)]).nullish(),
   "case_book_id": zod.number().int().min(1).max(updateSessionResponseOneOneCaseBookIdMax).nullable().describe('Optional shared or owned case book. Omitted/null clears the link; behavioral sessions always clear it.'),
   "story_id": zod.number().int().min(1).max(updateSessionResponseOneOneStoryIdMax).nullable().describe('Optional owned story for behavioral sessions. Omitted/null clears the link; a case session always clears it.'),
   "section_scores": zod.array(zod.object({
@@ -846,7 +929,7 @@ export const UpdateSessionResponse = zod.object({
   "score": zod.number().int().min(1).max(updateSessionResponseOneOneSectionScoresItemScoreMax),
   "went_well": zod.string().max(updateSessionResponseOneOneSectionScoresItemWentWellMax).nullish(),
   "to_improve": zod.string().max(updateSessionResponseOneOneSectionScoresItemToImproveMax).nullish()
-})).max(updateSessionResponseOneOneSectionScoresMax).optional().describe('Scored sections only; omit N/A sections. Empty or omitted replaces all scores with none. Nonempty scores are rejected for behavioral sessions. Sections must exist and cannot repeat.'),
+})).optional().describe('Scored sections only; omit N/A sections. Empty or omitted replaces all scores with none. Nonempty scores are rejected for behavioral sessions. Sections must exist and cannot repeat.'),
   "session_date": zod.string().regex(updateSessionResponseOneOneSessionDateRegExp).describe('Required valid calendar date, not in the future.'),
   "question_type_id": zod.number().int().min(1).max(updateSessionResponseOneOneQuestionTypeIdMax),
   "prompt": zod.string().min(1).max(updateSessionResponseOneOnePromptMax).describe('Trimmed before validation; whitespace-only prompts are rejected.'),
@@ -899,15 +982,14 @@ export const GetCaseBooksResponse = zod.object({
 })
 
 
-export const createCaseBookBodyPublicationYearMin = 1000;
-export const createCaseBookBodyPublicationYearMax = 9999;
+export const createCaseBookBodyPublicationYearMin = 1990;
 
 export const createCaseBookBodyNameMax = 60;
 
 
 
 export const CreateCaseBookBody = zod.object({
-  "publication_year": zod.number().int().min(createCaseBookBodyPublicationYearMin).max(createCaseBookBodyPublicationYearMax).nullish(),
+  "publication_year": zod.number().int().min(createCaseBookBodyPublicationYearMin).nullish().describe('Optional whole year, no later than next calendar year. The session form\'s inline add sends only a name.'),
   "name": zod.string().max(createCaseBookBodyNameMax)
 })
 

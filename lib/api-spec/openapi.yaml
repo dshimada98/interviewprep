@@ -209,11 +209,84 @@ paths:
                   $ref: "#/components/schemas/CaseSection"
         "401":
           description: Login required
+  /rubric:
+    get:
+      operationId: getRubric
+      summary: Current rubric, preferring the signed-in user's private edits
+      security: [{sessionCookie: []}]
+      responses:
+        "200":
+          description: All case sections and the behavioral overall rubric
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Rubric"
+        "401":
+          description: Login required
+  /rubric/{scope}/{score}:
+    put:
+      operationId: updateRubricEntry
+      security: [{sessionCookie: []}]
+      parameters:
+        - in: path
+          name: scope
+          required: true
+          schema: { type: string }
+          description: Case section ID as text, or behavioral_overall
+        - in: path
+          name: score
+          required: true
+          schema: { type: integer, minimum: 1, maximum: 5 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RubricEdit"
+      responses:
+        "200":
+          description: Saved private rubric entry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RubricEntry"
+        "400":
+          description: Invalid description
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionValidationError"
+        "401":
+          description: Login required
+        "404":
+          description: Unknown scope or score
+  /rubric/{scope}:
+    delete:
+      operationId: resetRubricScope
+      security: [{sessionCookie: []}]
+      parameters:
+        - in: path
+          name: scope
+          required: true
+          schema: { type: string }
+      responses:
+        "204":
+          description: Only this user's edits to the scope were removed
+        "401":
+          description: Login required
+        "404":
+          description: Unknown scope
   /sessions:
     get:
       operationId: listSessions
       security: [{sessionCookie: []}]
       parameters:
+        - in: query
+          name: style
+          description: Case interview style; not_set selects case sessions without a style.
+          schema:
+            type: string
+            enum: [interviewer_led, candidate_led, not_sure, not_set]
         - in: query
           name: q
           schema:
@@ -523,8 +596,12 @@ components:
           type: integer
     DashboardSummary:
       type: object
-      required: [total_cases, average_case_score, weakest_case_type, behavioral_sessions, cases_by_type, by_case_book, section_averages, heatmap, next_case_focus, section_progress]
+      required: [total_cases, average_case_score, weakest_case_type, behavioral_sessions, cases_by_type, by_case_book, by_case_style, section_averages, heatmap, next_case_focus, section_progress]
       properties:
+        by_case_style:
+          type: array
+          items:
+            $ref: "#/components/schemas/DashboardCaseStyle"
         section_progress:
           $ref: "#/components/schemas/SectionProgress"
         by_case_book:
@@ -725,8 +802,8 @@ components:
       properties:
         publication_year:
           type: [integer, "null"]
-          minimum: 1000
-          maximum: 9999
+          minimum: 1990
+          description: Optional whole year, no later than next calendar year. The session form's inline add sends only a name.
         name:
           type: string
           maxLength: 60
@@ -813,10 +890,53 @@ components:
         total:
           type: integer
           description: Total number of sessions owned by this user, before search or filters.
+    ScoreLevelName:
+      type: string
+      enum: [Needs rescue, Below bar, At bar, Strong, Offer-level]
+    RubricEntry:
+      type: object
+      required: [score, level_name, description, edited]
+      properties:
+        score: { type: integer, minimum: 1, maximum: 5 }
+        level_name:
+          $ref: "#/components/schemas/ScoreLevelName"
+        description: { type: string, minLength: 1, maxLength: 200 }
+        edited: { type: boolean }
+    RubricScope:
+      type: object
+      required: [scope, name, subtitle, entries]
+      properties:
+        scope:
+          type: string
+          description: Case section ID, or behavioral_overall
+        name: { type: string }
+        subtitle: { type: string }
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/RubricEntry"
+    Rubric:
+      type: object
+      required: [scopes]
+      properties:
+        scopes:
+          type: array
+          items:
+            $ref: "#/components/schemas/RubricScope"
+    RubricEdit:
+      type: object
+      required: [description]
+      properties:
+        description:
+          type: string
+          minLength: 1
+          maxLength: 200
     CaseSection:
       type: object
-      required: [id, name, display_order]
+      required: [id, name, display_order, subtitle]
       properties:
+        subtitle:
+          type: string
         id:
           type: integer
         name:
@@ -863,10 +983,34 @@ components:
               type: array
               items:
                 $ref: "#/components/schemas/SectionScore"
+    CaseStyle:
+      type: [string, "null"]
+      enum: [interviewer_led, candidate_led, not_sure, null]
+    DashboardCaseStyle:
+      type: object
+      required: [case_style, name, count, average_score, weakest_section]
+      properties:
+        case_style:
+          $ref: "#/components/schemas/CaseStyle"
+        name:
+          type: string
+        count:
+          type: integer
+        average_score:
+          type: number
+        weakest_section:
+          type: [string, "null"]
+          description: Lowest-average section scored at least twice within this style.
     SessionInput:
       type: object
       required: [session_date, question_type_id, prompt, format, overall_score]
       properties:
+        case_book_publication_year:
+          type: [integer, "null"]
+          minimum: 1990
+          description: Optional typed edition year, at most next calendar year. Blank/omitted/null means unknown. A visible chosen book ID supplies the name; the server resolves shared edition, then owned edition, then creates an owned edition.
+        case_style:
+          $ref: "#/components/schemas/CaseStyle"
         case_book_id:
           type: [integer, "null"]
           minimum: 1
@@ -880,7 +1024,6 @@ components:
         section_scores:
           description: Scored sections only; omit N/A sections. Empty or omitted replaces all scores with none. Nonempty scores are rejected for behavioral sessions. Sections must exist and cannot repeat.
           type: array
-          maxItems: 7
           items:
             $ref: "#/components/schemas/SectionScoreInput"
         session_date:

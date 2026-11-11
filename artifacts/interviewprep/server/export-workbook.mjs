@@ -1,5 +1,4 @@
 import ExcelJS from 'exceljs';
-import { caseSectionSeeds } from './case-sections.mjs';
 
 const NAVY = 'FF1F2A44';
 const FILLS = { red: 'FFF5B7B1', amber: 'FFFAD7A0', green: 'FFABEBC6' };
@@ -101,13 +100,15 @@ export function buildExportWorkbook(data, today) {
     notesBySession.get(n.session_id).set(n.section_name, n.score);
   }
   table(workbook.addWorksheet('Cases'), [dateCol, col('Case book', 36, { wrap: true }),
+    col('Interview style', 22),
     col('Case type', 26), longCol('Prompt'), col('Format', 14), scoreCol('Overall score'),
-    ...caseSectionSeeds.map(scoreCol), longCol('What went well'), longCol('What to improve'), col('Starred', 12)],
+    ...data.sections.map(s => scoreCol(s.name)), longCol('What went well'), longCol('What to improve'), col('Starred', 12)],
   data.sessions.filter(s => s.kind === 'case').map(s => [
     date(s.session_date), s.case_book_name == null ? 'No book / live case'
       : `${s.case_book_name}${s.publication_year == null ? '' : ` (${s.publication_year})`}`,
+    ({ interviewer_led: 'Interviewer-led', candidate_led: 'Candidate-led', not_sure: 'Not sure' })[s.case_style] ?? null,
     text(s.question_type_name), text(s.prompt), text(s.format), s.overall_score,
-    ...caseSectionSeeds.map(name => notesBySession.get(s.id)?.get(name) ?? null),
+    ...data.sections.map(section => notesBySession.get(s.id)?.get(section.name) ?? null),
     text(s.went_well), text(s.to_improve), s.starred ? 'Yes' : 'No',
   ]));
   table(workbook.addWorksheet('Section notes'), [dateCol, longCol('Prompt'), col('Section', 30),
@@ -123,5 +124,8 @@ export function buildExportWorkbook(data, today) {
     col('Times practiced', 18), col('Average score', 18, { score: true, decimals: true })],
   data.stories.map(s => [text(s.title), text(s.competency_name), text(s.context), text(s.situation),
     text(s.task), text(s.action), text(s.result), s.times_practiced, s.average_score]));
+  table(workbook.addWorksheet('Rubric'), [col('Section', 32), col('Score', 12), col('Level name', 22), longCol('Description')],
+    data.rubric.scopes.flatMap(scope => scope.entries.map(entry =>
+      [scope.name, entry.score, entry.level_name, entry.description])));
   return workbook;
 }

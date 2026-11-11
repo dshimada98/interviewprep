@@ -5,7 +5,7 @@ import { createCaseBook, useCreateCaseBook, useGetCaseBooks, type CaseBook, type
 import { authRequest, sessionRequestOptions, useAuth } from '@/auth';
 import { caseBooksKey, statusOf } from './session-keys';
 import { isCustom } from './category-select';
-import { caseBookLabel } from './case-book-label';
+import { groupBookNames, normBookName } from './case-book-name';
 
 const ADD_BOOK = '__add_book__';
 const GENERIC = "Couldn't add that case book. Please try again.";
@@ -37,17 +37,18 @@ export function useCaseBooks() {
 }
 
 type Props = {
-  id: string; value: string; onChange: (v: string) => void; onAddingChange?: (adding: boolean) => void;
+  id: string; value: string; onChange: (v: string, name: string | null) => void; knownName?: string; onAddingChange?: (adding: boolean) => void;
   disabled?: boolean; className: string; invalid?: boolean; describedBy?: string; style?: CSSProperties;
 };
 
-export function CaseBookSelect({ id, value, onChange, onAddingChange, disabled, className, invalid, describedBy, style }: Props) {
+export function CaseBookSelect({ id, value, knownName, onChange, onAddingChange, disabled, className, invalid, describedBy, style }: Props) {
   const { user } = useAuth();
   const qc = useQueryClient();
   const books = useCaseBooks();
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState('');
-  const [year, setYear] = useState('');
+  // A just-created book stays selectable before the refetched list includes it.
+  const [extra, setExtra] = useState<CaseBook | null>(null);
   const [err, setErr] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const selectRef = useRef<HTMLSelectElement>(null);
@@ -71,22 +72,19 @@ export function CaseBookSelect({ id, value, onChange, onAddingChange, disabled, 
     },
   });
 
-  function close() { setAdding(false); setName(''); setYear(''); setErr(''); requestAnimationFrame(() => selectRef.current?.focus()); }
+  function close() { setAdding(false); setName(''); setErr(''); requestAnimationFrame(() => selectRef.current?.focus()); }
 
   function save() {
     if (create.isPending) return;
-    if (year.trim() && (!/^\d{4}$/.test(year.trim()) || Number(year) < 1000)) {
-      setErr('Please enter a four-digit year, like 2025.');
-      return;
-    }
     setErr('');
-    create.mutate({ data: { name, publication_year: year.trim() ? Number(year) : null } }, {
+    create.mutate({ data: { name, publication_year: null } }, {
       onSuccess: b => {
         qc.setQueryData<CaseBookList>(caseBooksKey(user?.id), old => old && !old.books.some(x => x.id === b.id)
           ? { ...old, books: sortBooks([...old.books, b]) } : old);
         void qc.invalidateQueries({ queryKey: caseBooksKey(user?.id), exact: true });
-        onChange(String(b.id));
-        setAdding(false); setName(''); setYear('');
+        setExtra(b);
+        onChange(String(b.id), b.name);
+        setAdding(false); setName('');
         requestAnimationFrame(() => selectRef.current?.focus());
       },
       onError: e => setErr(errMessage(e)),
@@ -105,16 +103,23 @@ export function CaseBookSelect({ id, value, onChange, onAddingChange, disabled, 
   }
   const list = books.data?.books ?? [];
   // Keep a saved book visible even if it no longer appears in the list.
-  const missing = value && !list.some(b => String(b.id) === value);
+  const all = extra && !list.some(b => b.id === extra.id) ? [...list, extra] : list;
+  const groups = groupBookNames(all);
+  const current = all.find(b => String(b.id) === value);
+  // Display by normalized name; the original edition id is kept by the parent for submission.
+  const curKey = current ? normBookName(current.name) : value && knownName ? normBookName(knownName) : '';
+  const missing = !!value && !groups.some(g => g.key === curKey);
+  const selValue = !value ? '' : `n:${curKey}`;
   const errId = `${id}-add-err`;
   return (
     <div className="space-y-2 min-w-0">
       <select ref={selectRef} id={id} data-testid="select-case-book" className={className} style={style} disabled={disabled || adding}
-        aria-invalid={invalid} aria-describedby={describedBy} value={value}
-        onChange={e => { if (e.target.value === ADD_BOOK) { setAdding(true); setErr(''); } else onChange(e.target.value); }}>
+        aria-invalid={invalid} aria-describedby={describedBy} value={selValue}
+        onChange={e => { if (e.target.value === ADD_BOOK) { setAdding(true); setErr(''); } else if (!e.target.value) onChange('', null);
+          else { const k = e.target.value.slice(2); if (k === curKey) return; const g = groups.find(x => x.key === k); if (g) onChange(String(g.rep.id), g.name); } }}>
         <option value="">{NO_BOOK}</option>
-        {missing && <option value={value}>Saved case book</option>}
-        {list.map(b => <option key={b.id} value={String(b.id)}>{caseBookLabel(b.name, b.publication_year)}{isCustom(b) ? ' (custom)' : ''}</option>)}
+        {missing && <option value={selValue}>{knownName?.trim() || 'Saved case book'}</option>}
+        {groups.map(g => <option key={g.key} value={`n:${g.key}`}>{g.name}</option>)}
         <option value={ADD_BOOK}>+ Add your own case book</option>
       </select>
       {adding && (
@@ -130,19 +135,6 @@ export function CaseBookSelect({ id, value, onChange, onAddingChange, disabled, 
               if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); save(); }
               else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); if (!create.isPending) close(); }
             }} />
-          <label htmlFor={`${id}-year`} className="block text-sm font-semibold">
-            Publication year <span className="font-normal text-muted-foreground">(optional)</span>
-          </label>
-          <input id={`${id}-year`} data-testid="input-case-book-year" value={year}
-            type="text" inputMode="numeric" maxLength={4} placeholder="2025" disabled={create.isPending}
-            aria-describedby={`${id}-year-hint${err ? ` ${errId}` : ''}`}
-            className="ip-focus block w-full min-w-0 min-h-11 rounded-lg border bg-white px-3.5 text-base"
-            onChange={e => { setYear(e.target.value); if (err) setErr(''); }}
-            onKeyDown={e => {
-              if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); save(); }
-              else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); if (!create.isPending) close(); }
-            }} />
-          <p id={`${id}-year-hint`} className="text-xs text-muted-foreground">Different years are tracked as separate editions.</p>
           {err && <p id={errId} role="alert" className="text-sm font-medium" style={{ color: '#C0392B' }} data-testid="text-case-book-error">{err}</p>}
           <div className="grid grid-cols-2 sm:flex sm:justify-end gap-2">
             <button type="button" data-testid="button-cancel-case-book" disabled={create.isPending} onClick={close}

@@ -1,8 +1,9 @@
 import { pool } from './db.mjs';
+import { sectionSubtitles } from './rubric-defaults.mjs';
 
 export const caseSectionSeeds = [
   'Introduction', 'Framework', 'Exhibits', 'Math', 'Brainstorm',
-  'Recommendation', 'Driving the case forward',
+  'Recommendation', 'Driving the case forward', 'Delivery',
 ];
 
 export async function seedCaseSections(database = pool) {
@@ -14,8 +15,9 @@ export async function seedCaseSections(database = pool) {
   );
 }
 
-export async function getCaseSections() {
-  return (await pool.query('SELECT id, name, display_order FROM case_sections ORDER BY display_order, id')).rows;
+export async function getCaseSections(database = pool) {
+  return (await database.query('SELECT id, name, display_order FROM case_sections ORDER BY display_order, id'))
+    .rows.map(s => ({ ...s, subtitle: sectionSubtitles[s.name] ?? '' }));
 }
 
 // Parent ownership must already be established by the session handler.

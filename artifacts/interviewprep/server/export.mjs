@@ -1,6 +1,8 @@
 import { pool } from './db.mjs';
 import { getDashboard } from './dashboard.mjs';
 import { buildExportWorkbook } from './export-workbook.mjs';
+import { getCaseSections } from './case-sections.mjs';
+import { getRubric } from './rubric.mjs';
 
 export async function readExportData(userId) {
   const client = await pool.connect();
@@ -8,6 +10,8 @@ export async function readExportData(userId) {
     // All sheets and the reused dashboard calculations describe one snapshot.
     await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
     const dashboard = await getDashboard(userId, client);
+    const sections = await getCaseSections(client);
+    const rubric = await getRubric(userId, client);
     const sessions = (await client.query(`SELECT p.*, p.session_date::text AS session_date,
       q.name AS question_type_name,q.kind,b.name AS case_book_name,b.publication_year,
       st.title AS story_title,EXISTS(SELECT 1 FROM stars x WHERE x.user_id=$1 AND x.session_id=p.id) AS starred
@@ -33,7 +37,7 @@ export async function readExportData(userId) {
       FROM checklist_items c LEFT JOIN case_sections s ON s.id=c.section_id
       WHERE c.user_id=$1 AND NOT c.done ORDER BY c.created_at DESC,c.id DESC`, [userId])).rows;
     await client.query('COMMIT');
-    return { dashboard, sessions, sectionNotes, stories, checklist };
+    return { dashboard, sessions, sectionNotes, stories, checklist, sections, rubric };
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;

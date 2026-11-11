@@ -38,7 +38,7 @@ test('case scorecard seeding, privacy, atomic replacement and database constrain
     await t.test('reference API requires login and startup seeds are ordered and idempotent', async () => {
       await request(app).get('/api/case-sections').expect(401);
       assert.deepEqual(sections.map(row => row.name), caseSectionSeeds);
-      assert.deepEqual(sections.map(row => row.display_order), [1, 2, 3, 4, 5, 6, 7]);
+      assert.deepEqual(sections.map(row => row.display_order), sections.map((_, i) => i + 1));
       await Promise.all([seedCaseSections(), seedCaseSections()]);
       assert.deepEqual((await b.agent.get('/api/case-sections').expect(200)).body, sections);
     });
@@ -125,14 +125,14 @@ test('case scorecard seeding, privacy, atomic replacement and database constrain
       const scores = sections.map(row => ({ section_id: row.id, score: 4, went_well: 'Updated' }));
       for (let i = 0; i < 3; i++) {
         const result = await write(a, 'put', `/api/sessions/${session.id}`, { ...base, section_scores: scores }).expect(200);
-        assert.equal(result.body.section_scores.length, 7);
+        assert.equal(result.body.section_scores.length, sections.length);
       }
       await Promise.all([4, 5].map(score => write(a, 'put', `/api/sessions/${session.id}`, {
         ...base, section_scores: sections.map(row => ({ section_id: row.id, score })),
       }).expect(200)));
       const saved = (await a.agent.get(`/api/sessions/${session.id}`).expect(200)).body;
-      assert.equal(saved.section_scores.length, 7);
-      assert.equal(new Set(saved.section_scores.map(row => row.section_id)).size, 7);
+      assert.equal(saved.section_scores.length, sections.length);
+      assert.equal(new Set(saved.section_scores.map(row => row.section_id)).size, sections.length);
       assert.equal(new Set(saved.section_scores.map(row => row.score)).size, 1);
     });
     await t.test('N/A removes rows; behavioral sessions reject scores without saving', async () => {

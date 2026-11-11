@@ -1,9 +1,9 @@
 # InterviewPrep database schema — Features 1–13
 
 The application's SQL source of truth is
-`artifacts/interviewprep/server/schema.sql`. There are nine product tables
+`artifacts/interviewprep/server/schema.sql`. There are ten product tables
 (`users`, `question_types`, `practice_sessions`, `case_sections`, and
-`section_scores`, `stars`, `stories`, `case_books`, and `checklist_items`) plus the existing technical `login_sessions` table used for
+`section_scores`, `stars`, `stories`, `case_books`, `checklist_items`, and `rubric_entries`) plus the existing technical `login_sessions` table used for
 authentication. Behavioral practice sessions may optionally link to an owned story.
 
 ## users
@@ -29,14 +29,16 @@ custom types belong to one user. Custom categories are behavioral only.
 
 Names are compared ignoring capitalization, leading/trailing whitespace, and
 repeated whitespace. Partial unique indexes enforce shared and per-owner
-uniqueness; a database trigger also rejects shared/private name collisions and
+uniqueness; a database trigger also rejects new private/shared name collisions and
 non-behavioral custom types. Equal names for two different private owners are
 allowed. Custom names must be nonblank and at most 40 characters.
+New shared seeds may coexist with pre-existing private categories without
+changing those categories' IDs, kinds, or historical session links.
 
 Initial reference rows:
 
 - **Case:** Market Sizing, Profitability, Market Entry, M&A, Growth Strategy,
-  Pricing, Operations.
+  Pricing, Operations, Private Equity, Wildcard.
 - **Behavioral:** Leadership, Teamwork, Conflict, Failure / Setback, Impact,
   Why Consulting, Tell me about yourself, Why this firm, Influencing without
   authority, Entrepreneurial drive, Courageous change, Navigating ambiguity,
@@ -58,7 +60,8 @@ case sessions, while a case session has one book or none.
 
 Partial unique indexes and a scope-check trigger enforce case-insensitive,
 whitespace-normalized uniqueness for the **same name and publication year**
-against shared editions and the user's own books. Different years are separate
+within each owner's editions and prevent new private duplicates of shared
+editions. Shared seeds may coexist with pre-existing private editions. Different years are separate
 books with separate IDs, session filters, and dashboard aggregates. Unknown-year
 books are distinct from dated editions; two unknown-year books with the same
 name still conflict within the same visibility scope. Different private owners
@@ -68,25 +71,57 @@ may use the same edition. Server identity—not submitted
 Shared seeds: Case in Point, Victor Cheng (Case Interview Secrets), Haas Casebook,
 Wharton Casebook, Kellogg Casebook, Columbia Casebook, Darden Casebook, Tuck
 Casebook, Ross Casebook, Fuqua Casebook, MIT Sloan Casebook, Stern Casebook,
-Firm website practice cases.
+Firm website practice cases, Booth Casebook. Shared seeds insert only missing
+rows at startup. A newly shared book may coexist with a legacy private edition;
+existing private IDs and session links are never changed. New private duplicates
+of an already-shared edition are still rejected.
 
 `GET /api/case-books` returns `{ books, most_recent_case_book_id }`: shared books
 alphabetically, then the user's private books alphabetically. The most recent
 case is ordered by session date, creation timestamp, then ID descending. Its book
-ID (including NULL for a live case) defaults only the new-session form; editing
-keeps the saved book, and refetching never overwrites a user's draft choice.
+ID (including NULL for a live case) defaults the new-session form's book name
+AND year; editing pre-fills the saved name and year, and refetching never
+overwrites a user's draft choice.
 `POST /api/case-books` accepts `{ name, publication_year? }` and creates a private
 book. The year is optional; omitted/null leaves it unknown. Existing books and
 links keep their IDs and an unknown year; shared seed years are never guessed.
-The form, filters, session cards/details, and dashboard show known years as
-`Name (2025)`. Session responses expose `case_book_publication_year`; dashboard
-book rows expose `publication_year`.
+The session form lists each normalized name once, combines shared and owned
+editions by name, and has a separate optional typed edition year. Inline add
+asks for a name only. When saving a session, `case_book_id` must be shared or
+owned by the logged-in user. The server takes that book's name and the submitted
+`case_book_publication_year` (blank, omitted, or NULL means unknown) and resolves:
+
+1. A shared edition with that normalized name and year.
+2. Otherwise, that user's private edition with that name and year.
+3. Otherwise, a new private edition for that user.
+
+Resolution and session saving share a transaction. A transaction-scoped advisory
+lock using the same normalized name/year key as the scope trigger serializes
+lookup plus insert; the unique edition indexes also remain in place. Two quick
+saves reuse one private edition. Other owners' books are never eligible, even
+when the submitted ID or name/year matches. No editions table was added.
+
+New typed years must be whole numbers from 1990 through next calendar year
+(calculated at validation time). The broader existing database range is retained
+to avoid altering historical rows. Filters, session cards/details, dashboard book
+rows, and Excel still distinguish and label editions as `Name (2025)`.
+Session responses expose `case_book_publication_year`; dashboard book rows expose
+`publication_year`.
 
 ## practice_sessions
 
 Each practice session belongs to exactly one user. Feature 3 uses this existing
 table for the authenticated practice log, creation, detail, editing, and deletion.
 Feature 10 adds an optional story link without replacing existing session data.
+
+Interview style is case-only: empty/omitted values are stored as NULL, and saving
+a session as behavioral clears the style. `GET /api/sessions?style=` accepts
+`interviewer_led`, `candidate_led`, `not_sure`, or `not_set` (case sessions with
+NULL style), always within the logged-in user's data. Dashboard `by_case_style`
+uses owned case sessions, rounds overall averages to one decimal, and includes
+a weakest section only when it has been scored at least twice within that style.
+Apply the updated idempotent `schema.sql` before running this version against an
+existing database; seeding does not perform schema migrations.
 
 | Column | PostgreSQL type | Rules |
 | --- | --- | --- |
@@ -95,6 +130,7 @@ Feature 10 adds an optional story link without replacing existing session data.
 | question_type_id | integer | Required foreign key to `question_types.id` |
 | story_id | integer, nullable | Foreign key to `stories.id`, `ON DELETE SET NULL`; only an owned story on a behavioral session |
 | case_book_id | integer, nullable | Foreign key to case_books.id, ON DELETE SET NULL; shared or owned book on a case session only |
+| case_style | text, nullable | Optional `interviewer_led`, `candidate_led`, or `not_sure`; database CHECK rejects other non-NULL values |
 | session_date | date | Required calendar date, no time of day |
 | prompt | text | Required |
 | format | text | Required, defaults to `solo`; database check allows `solo`, `partner`, or `mock` |
@@ -437,7 +473,7 @@ deferred to Feature 5.
 | display_order | integer | Required; determines scorecard order |
 
 Startup inserts only missing names in both development and production, preserving
-existing rows and IDs. The seven initial rows are:
+existing rows and IDs. The eight shared rows are:
 
 1. Introduction
 2. Framework
@@ -446,9 +482,13 @@ existing rows and IDs. The seven initial rows are:
 5. Brainstorm
 6. Recommendation
 7. Driving the case forward
+8. Delivery
 
 `GET /api/case-sections` requires login and returns `id`, `name`, and
-`display_order`, sorted by `display_order`. These rows are shared by all users.
+`display_order` plus the skill `subtitle`, sorted by `display_order`. These rows
+are shared by all users. Adding Delivery does not create or backfill any
+`section_scores`: old sessions display it as N/A. Section lists and Excel Cases
+columns are read from this table, not a fixed list.
 
 ### section_scores — private through the parent session
 
@@ -503,7 +543,7 @@ GET `/api/sessions/:id`, POST, and PUT return `section_scores`, sorted by sectio
 `section_name`, and `display_order`. The detail read uses one ownership-scoped
 SQL statement for a consistent snapshot. The list remains a lightweight summary.
 
-The form shows the seven-row scorecard only for Case sessions. Notes expand on
+The form shows the table-driven scorecard only for Case sessions. Notes expand on
 request and start expanded when editing a section with saved notes. Detail
 shows a desktop table or phone cards, including gray N/A sections. Scores and
 notes use the same Save action as the session, not separate requests.
@@ -644,3 +684,38 @@ Session list/detail responses include current `story_id` and `story_title`.
 The database's `ON DELETE SET NULL` preserves practice sessions, overall scores
 and stars when a story is removed. Deleting a user cascades owned stories as well
 as their existing practice data.
+
+## rubric_entries — shared defaults and private overrides
+
+| Column | PostgreSQL type | Rules |
+| --- | --- | --- |
+| id | integer (`SERIAL`) | Primary key |
+| scope | text | Existing `case_sections.id` as text, or `behavioral_overall`; checked by a database trigger |
+| score | integer | Required, 1–5 |
+| description | text | Required, nonblank, at most 200 characters |
+| user_id | integer, nullable | Null for shared defaults; otherwise owner FK to `users.id`, `ON DELETE CASCADE` |
+
+`UNIQUE NULLS NOT DISTINCT (scope, score, user_id)` prevents duplicate defaults
+as well as duplicate private overrides. Startup seeds the five supplied
+descriptions for each of the eight case sections and behavioral overall,
+inserting only missing defaults. Apply the updated `schema.sql` before startup;
+startup performs reference-data seeding, not schema changes.
+
+Authenticated `GET /api/rubric` returns every scope with its subtitle and five
+levels: **Needs rescue**, **Below bar**, **At bar**, **Strong**, and **Offer-level**.
+Each entry prefers the signed-in user's description over the shared default,
+and includes `edited: true` only for that user's override. No other user's
+overrides are considered.
+
+`PUT /api/rubric/:scope/:score` accepts `{ description }` and saves only a private
+override owned by the signed-in user. Blank input returns
+`Please describe what this score means.`; overlong input returns
+`Please keep it under 200 characters.` in `errors.description`.
+`DELETE /api/rubric/:scope` resets only that user's edits for that scope, leaving
+other users, shared defaults, other sections, and historical scores untouched.
+Both writes require the existing CSRF protection.
+
+The Rubric page and scorecard help use this effective rubric. Excel's Rubric
+sheet uses the same authenticated user's definitions within the export snapshot.
+`tests/rubric.test.ts` covers defaults, level names, idempotent seeding, private
+edits and resets, validation and CSRF, Delivery/N/A dashboard behavior, and export.

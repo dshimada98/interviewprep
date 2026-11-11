@@ -4,12 +4,13 @@ import {
 } from '@workspace/api-client-react';
 import { AddNoteButton } from './checklist';
 import { useCaseSections } from './case-sections-query';
+import { LEVEL_NAMES as LABEL } from './score-levels';
+import { CalibrationTips, RubricHelp, SelectedLevel } from './rubric-help';
 export { useCaseSections } from './case-sections-query';
 
 export type ScoreDraft = { score: number | null; went_well: string; to_improve: string; open: boolean };
 export type ScoreDrafts = Record<number, ScoreDraft>;
 
-const LABEL = ['', 'Struggled', 'Shaky', 'Solid', 'Strong', 'Excellent'];
 const BLANK: ScoreDraft = { score: null, went_well: '', to_improve: '', open: false };
 
 export function draftsFrom(scores: SectionScore[] | undefined): ScoreDrafts {
@@ -59,6 +60,7 @@ export function ScorecardEditor({ drafts, onChange, disabled, query, error }: {
     <fieldset className="space-y-3" data-testid="section-scorecard"
       style={error ? { outline: '1px solid #C0392B', outlineOffset: 4, borderRadius: 8 } : undefined}>
       <legend className="text-sm font-semibold">Scorecard<span className="ml-1.5 font-normal text-muted-foreground">(rate each section, or leave N/A)</span></legend>
+      <CalibrationTips />
       {query.isLoading ? (
         <div className="space-y-2" aria-busy="true"><span className="sr-only" role="status">Loading case sections</span>
           {[0, 1, 2, 3].map(i => <div key={i} className="ip-skel h-16 rounded-lg" />)}
@@ -74,7 +76,7 @@ export function ScorecardEditor({ drafts, onChange, disabled, query, error }: {
                 style={{ borderLeft: `4px solid ${d.score ? `var(--score-${d.score})` : 'hsl(var(--border))'}` }}>
                 <div className="flex flex-col lg:flex-row lg:items-center gap-2 lg:gap-4">
                   <div className="flex items-center justify-between gap-2 lg:w-52 lg:shrink-0">
-                    <span className="font-semibold text-sm">{sec.name}</span>
+                    <span className="flex items-center gap-0.5 min-w-0"><span className="min-w-0"><span className="block font-semibold text-sm">{sec.name}</span>{sec.subtitle && <span className="block text-xs text-muted-foreground" data-testid={`text-section-subtitle-${sec.id}`}>{sec.subtitle}</span>}</span><RubricHelp scope={String(sec.id)} name={sec.name} /></span>
                     <button type="button" data-testid={`button-notes-${sec.id}`} aria-expanded={d.open} disabled={disabled}
                       onClick={() => patch(sec.id, { open: !d.open })}
                       className="ip-focus lg:hidden min-h-11 px-2 inline-flex items-center gap-1 text-xs font-semibold rounded hover:underline underline-offset-4">
@@ -101,6 +103,7 @@ export function ScorecardEditor({ drafts, onChange, disabled, query, error }: {
                     {d.open ? <ChevronDown className="h-3.5 w-3.5" aria-hidden /> : <Plus className="h-3.5 w-3.5" aria-hidden />}{d.open ? 'Hide notes' : 'Add notes'}
                   </button>
                 </div>
+                <SelectedLevel scope={String(sec.id)} score={d.score} testid={`text-section-level-${sec.id}`} />
                 {d.open && (
                   <div className="mt-3 grid gap-3 md:grid-cols-2">
                     {(['went_well', 'to_improve'] as const).map(k => (
@@ -141,8 +144,8 @@ const Note = ({ v }: { v: string | null | undefined }) =>
 export function ScorecardView({ scores, sessionId }: { scores: SectionScore[]; sessionId?: number }) {
   const q = useCaseSections();
   const byId = new Map(scores.map(s => [s.section_id, s]));
-  const rows: { id: number; name: string; s?: SectionScore }[] = q.data
-    ? sorted(q.data).map(sec => ({ id: sec.id, name: sec.name, s: byId.get(sec.id) }))
+  const rows: { id: number; name: string; sub?: string; s?: SectionScore }[] = q.data
+    ? sorted(q.data).map(sec => ({ id: sec.id, name: sec.name, sub: sec.subtitle, s: byId.get(sec.id) }))
     : [...scores].sort((a, b) => a.display_order - b.display_order).map(s => ({ id: s.section_id, name: s.section_name, s }));
   return (
     <section className="ip-rise mt-6 rounded-xl border bg-white p-4 sm:p-6" style={{ animationDelay: '100ms' }} data-testid="section-scorecard-view">
@@ -158,8 +161,8 @@ export function ScorecardView({ scores, sessionId }: { scores: SectionScore[]; s
             <tbody className="divide-y">
               {rows.map(r => (
                 <tr key={r.id} data-testid={`row-scorecard-${r.id}`} className="align-top">
-                  <td className="py-3 pr-3 font-semibold">{r.name}</td>
-                  <td className="py-3 pr-3"><Badge score={r.s?.score ?? null} /></td>
+                  <td className="py-3 pr-3"><span className="block font-semibold">{r.name}</span>{r.sub && <span className="block text-xs text-muted-foreground" data-testid={`text-scorecard-subtitle-${r.id}`}>{r.sub}</span>}</td>
+                  <td className="py-3 pr-3"><Badge score={r.s?.score ?? null} />{r.s && <span className="mt-1 block text-xs text-muted-foreground" data-testid={`text-scorecard-level-${r.id}`}>{LABEL[r.s.score]}</span>}</td>
                   <td className="py-3 pr-3"><Note v={r.s?.went_well} /></td>
                   <td className="py-3"><Note v={r.s?.to_improve} />{sessionId != null && r.s?.to_improve && <AddNoteButton sessionId={sessionId} sectionId={r.id} label={r.name} />}</td>
                 </tr>
@@ -170,7 +173,7 @@ export function ScorecardView({ scores, sessionId }: { scores: SectionScore[]; s
             {rows.map(r => (
               <li key={r.id} data-testid={`card-scorecard-${r.id}`} className="rounded-lg border p-3 text-sm"
                 style={{ borderLeft: `4px solid ${r.s ? `var(--score-${r.s.score})` : 'hsl(var(--border))'}` }}>
-                <div className="flex items-center justify-between gap-2"><span className="font-semibold">{r.name}</span><Badge score={r.s?.score ?? null} /></div>
+                <div className="flex items-center justify-between gap-2"><span className="min-w-0"><span className="block font-semibold">{r.name}</span>{r.sub && <span className="block text-xs text-muted-foreground">{r.sub}</span>}</span><span className="shrink-0 inline-flex items-center gap-2">{r.s && <span className="text-xs text-muted-foreground">{LABEL[r.s.score]}</span>}<Badge score={r.s?.score ?? null} /></span></div>
                 {r.s && (r.s.went_well || r.s.to_improve) && (
                   <dl className="mt-2 space-y-2">
                     <div><dt className="text-xs font-semibold text-muted-foreground">What went well</dt><dd><Note v={r.s.went_well} /></dd></div>

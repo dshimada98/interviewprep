@@ -7,7 +7,7 @@ import { visibleQuestionType } from './question-types.mjs';
 import { visibleCaseBook } from './case-books.mjs';
 const fields = `s.id, s.question_type_id, s.session_date::text, s.prompt, s.format,
   s.overall_score, s.duration_minutes, s.went_well, s.to_improve, s.created_at,
-  q.name AS question_type_name, q.kind, s.story_id, s.case_book_id,
+  q.name AS question_type_name, q.kind, s.story_id, s.case_book_id, s.case_style,
   (SELECT b.name FROM case_books b WHERE b.id=s.case_book_id
     AND (b.user_id IS NULL OR b.user_id=s.user_id) AND q.kind='case') AS case_book_name,
   (SELECT b.publication_year FROM case_books b WHERE b.id=s.case_book_id
@@ -83,8 +83,8 @@ practiceSessions.post('/', async (req, res) => {
     const data = await validated(req.body, res, database, req.user.id);
     if (!data) return null;
     const result = await database.query(`INSERT INTO practice_sessions (user_id, question_type_id, session_date, prompt, format,
-      overall_score, duration_minutes, went_well, to_improve, story_id, case_book_id)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id`, [req.user.id, ...data.values]);
+      overall_score, duration_minutes, went_well, to_improve, story_id, case_book_id, case_style)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id`, [req.user.id, ...data.values]);
     const id = result.rows[0].id;
     await replaceSectionScores(database, id, data.scores);
     return readSession(database, id, req.user.id);
@@ -129,7 +129,7 @@ practiceSessions.put('/:id', async (req, res) => {
     const data = await validated(req.body, res, database, req.user.id);
     if (!data) return null;
     await database.query(`UPDATE practice_sessions SET question_type_id=$3, session_date=$4, prompt=$5, format=$6,
-      overall_score=$7, duration_minutes=$8, went_well=$9, to_improve=$10, story_id=$11, case_book_id=$12
+      overall_score=$7, duration_minutes=$8, went_well=$9, to_improve=$10, story_id=$11, case_book_id=$12, case_style=$13
       WHERE id=$1 AND user_id=$2`, [req.params.id, req.user.id, ...data.values]);
     await replaceSectionScores(database, req.params.id, data.scores);
     return readSession(database, req.params.id, req.user.id);

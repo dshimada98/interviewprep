@@ -12,6 +12,7 @@ import { EditSessionPage, NewSessionPage, SessionCacheGuard, SessionDetailPage, 
 import { StoriesListPage } from '@/components/stories-list';
 import { EditStoryPage, NewStoryPage } from '@/components/stories-form';
 import { StoryDetailPage } from '@/components/story-detail';
+import { RubricPage } from '@/components/rubric-page';
 
 const queryClient = new QueryClient();
 
@@ -30,6 +31,7 @@ function Router() {
         <Route path="/stories/new"><Protected><NewStoryPage /></Protected></Route>
         <Route path="/stories/:id/edit">{(p) => <Protected><EditStoryPage key={p.id} rawId={p.id} /></Protected>}</Route>
         <Route path="/stories/:id">{(p) => <Protected><StoryDetailPage key={p.id} rawId={p.id} /></Protected>}</Route>
+        <Route path="/rubric"><Protected><RubricPage /></Protected></Route>
         <Route path="/login"><GuestOnly><AuthPage mode="login" /></GuestOnly></Route>
         <Route path="/signup"><GuestOnly><AuthPage key="signup" mode="signup" /></GuestOnly></Route>
         <Route><Protected><AppHeader /><NotFound /></Protected></Route>

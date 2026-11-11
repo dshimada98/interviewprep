@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import { Link } from 'wouter';
 import { ArrowDown, ArrowUp } from 'lucide-react';
+import { levelName } from './score-levels';
 import type { SectionProgress, SectionProgressSection } from '@workspace/api-client-react';
 import {
   SP_COLORS, SP_DOWN, SP_NA, SP_UP, calDate, fmt1, scoreColors, sortByChange, subtitle, trailing3,
@@ -72,7 +73,7 @@ function Spark({ pts, rolling, shadeFrom, name }: { pts: Pt[]; rolling?: (number
         {pts.map((p, i) => p.v === null ? null : (
           <circle key={i} cx={xOf(i)} cy={yOf(p.v)} r={p.big === false ? 3 : 4.5} fill={scoreColors(p.v)[0]}
             stroke={tip === i ? '#1F2A44' : scoreColors(p.v)[1]} strokeWidth={tip === i ? 2 : 1}
-            tabIndex={0} role="img" aria-label={`${p.label}, score ${fmt1(p.v)}`} className="cursor-pointer outline-none"
+            tabIndex={0} role="img" aria-label={`${p.label}, score ${fmt1(p.v)}, ${levelName(p.v)}`} className="cursor-pointer outline-none"
             onMouseEnter={() => setTip(i)} onFocus={() => setTip(i)} onBlur={() => setTip(null)} onClick={() => setTip(i)}
             onKeyDown={e => { if (e.key === 'Escape') setTip(null); }} />
         ))}
@@ -80,7 +81,7 @@ function Spark({ pts, rolling, shadeFrom, name }: { pts: Pt[]; rolling?: (number
       {t && t.v !== null && (
         <div role="tooltip" className="pointer-events-none absolute z-20 bottom-full mb-1 w-max max-w-[200px] break-words -translate-x-1/2 rounded-md px-2.5 py-1.5 text-xs shadow-lg"
           style={{ left: `${Math.min(80, Math.max(20, (xOf(tip as number) / W) * 100))}%`, background: 'var(--navy)', color: 'white' }}>
-          <span className="font-bold tabular-nums">{fmt1(t.v)}</span> · {t.label}
+          <span className="font-bold tabular-nums">{fmt1(t.v)}</span> {levelName(t.v)} · {t.label}
         </div>
       )}
     </div>
@@ -164,7 +165,7 @@ function Heatmap({ d, st }: { d: SectionProgress; st: SPState }) {
                   const v = c.sections.find(x => x.section_id === s.id)?.score ?? null;
                   const [bg, fg] = scoreColors(v);
                   return (
-                    <td key={c.key} data-testid={`cell-heatmap-${c.key}-${s.id}`} className="h-11 min-w-11 rounded px-1 text-center font-bold tabular-nums"
+                    <td key={c.key} data-testid={`cell-heatmap-${c.key}-${s.id}`} title={v === null ? `${s.name}: N/A` : `${s.name}: ${byCase ? v : fmt1(v)}, ${levelName(v)}`} className="h-11 min-w-11 rounded px-1 text-center font-bold tabular-nums"
                       style={{ background: bg, color: fg }}>
                       {v === null ? <><span aria-hidden>–</span><span className="sr-only">N/A</span></> : byCase ? v : fmt1(v)}
                     </td>
@@ -180,7 +181,7 @@ function Heatmap({ d, st }: { d: SectionProgress; st: SPState }) {
         </table>
       </div>
       <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs font-medium" aria-label="Score color legend">
-        {[1, 2, 3, 4, 5].map(n => <li key={n} className="inline-flex items-center gap-1.5"><span aria-hidden className="h-3 w-3 rounded-sm" style={{ background: SP_COLORS[n][0] }} />{n}</li>)}
+        {[1, 2, 3, 4, 5].map(n => <li key={n} className="inline-flex items-center gap-1.5"><span aria-hidden className="h-3 w-3 rounded-sm" style={{ background: SP_COLORS[n][0] }} />{n} {levelName(n)}</li>)}
         <li className="inline-flex items-center gap-1.5"><span aria-hidden className="h-3 w-3 rounded-sm" style={{ background: SP_NA[0] }} />N/A</li>
       </ul>
     </>
